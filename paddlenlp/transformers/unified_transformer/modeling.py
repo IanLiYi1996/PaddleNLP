@@ -37,7 +37,6 @@ class UnifiedTransformerPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "unified_transformer-12L-cn": {
             "vocab_size": 30004,
@@ -96,8 +95,27 @@ class UnifiedTransformerPretrainedModel(PretrainedModel):
             "eos_token_id": 2,
             "mask_token_id": 30000,
         },
+        "plato-xl": {
+            "vocab_size": 8001,
+            "hidden_size": 3072,
+            "num_hidden_layers": 72,
+            "num_attention_heads": 32,
+            "intermediate_size": 18432,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "normalize_before": True,
+            "max_position_embeddings": 1024,
+            "type_vocab_size": 3,
+            "role_type_size": 128,
+            "initializer_range": 0.02,
+            "unk_token_id": 0,
+            "pad_token_id": 0,
+            "bos_token_id": 1,
+            "eos_token_id": 2,
+            "mask_token_id": 8000,
+        }
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "unified_transformer-12L-cn":
@@ -106,6 +124,8 @@ class UnifiedTransformerPretrainedModel(PretrainedModel):
             "https://bj.bcebos.com/paddlenlp/models/transformers/unified_transformer/unified_transformer-12L-cn-luge.pdparams",
             "plato-mini":
             "https://bj.bcebos.com/paddlenlp/models/transformers/unified_transformer/plato-mini.pdparams",
+            "plato-xl":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unified_transformer/plato-xl.pdparams",
         }
     }
     base_model_prefix = "unified_transformer"
@@ -115,12 +135,17 @@ class UnifiedTransformerPretrainedModel(PretrainedModel):
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.
-            if isinstance(layer.weight, paddle.Tensor):
+            if isinstance(
+                    layer.weight,
+                    paddle.Tensor) and paddle.get_default_dtype() == "float32":
                 layer.weight.set_value(
+                    # TODO(guosheng): `normal` does not support float16, and
+                    # need to handle this when using fp16 as default dtype for
+                    # big models.
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range") else
+                        std=self.initializer_range if hasattr(
+                            self, "initializer_range") else
                         self.unified_transformer.config["initializer_range"],
                         shape=layer.weight.shape))
 
@@ -133,20 +158,57 @@ class UnifiedTransformerEmbeddings(nn.Layer):
                  hidden_size=768,
                  hidden_dropout_prob=0.1,
                  max_position_embeddings=512,
-                 type_vocab_size=2):
+                 type_vocab_size=2,
+                 role_type_size=None,
+                 pad_token_id=None):
         super(UnifiedTransformerEmbeddings, self).__init__()
         self.word_embeddings = nn.Embedding(vocab_size, hidden_size)
         self.position_embeddings = nn.Embedding(max_position_embeddings,
                                                 hidden_size)
         self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
+        self.role_embeddings = None if role_type_size is None else nn.Embedding(
+            role_type_size, hidden_size)
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
-    def forward(self, input_ids, token_type_ids, position_ids):
+        self.pad_token_id = pad_token_id
+
+    def forward(self,
+                input_ids,
+                token_type_ids=None,
+                position_ids=None,
+                role_ids=None):
+        if position_ids is None:
+            if self.pad_token_id is None:
+                position_ids = paddle.expand_as(
+                    paddle.arange(end=paddle.shape(input_ids)[1],
+                                  dtype="int64"), input_ids)
+            else:
+                # NOTE: If there is a unk_token_id in input_ids, the following logic is wrong.
+                # In that case, the position_ids must be provided.
+                # And this is for left padding input_ids.
+                num_pad = paddle.sum(
+                    (input_ids == self.pad_token_id).astype("float32"),
+                    axis=-1,
+                    keepdim=True)
+                position_ids = F.relu(
+                    paddle.expand_as(
+                        paddle.arange(end=paddle.shape(input_ids)[1],
+                                      dtype="float32"), input_ids) -
+                    num_pad).astype("int64")
+            position_ids.stop_gradient = True
+
         input_embedings = self.word_embeddings(input_ids)
         position_embeddings = self.position_embeddings(position_ids)
+
+        if token_type_ids is None:
+            token_type_ids = paddle.zeros_like(input_ids, dtype="int64")
+            token_type_ids.stop_gradient = True
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
         embeddings = input_embedings + position_embeddings + token_type_embeddings
+        # A model with role_embeddings can generate without role_ids.
+        if role_ids is not None:
+            embeddings += self.role_embeddings(role_ids)
         embeddings = self.dropout(embeddings)
         return embeddings
 
@@ -221,25 +283,25 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
             The id of special token `mask_token`. Defaults to 30000.
     """
 
-    def __init__(
-            self,
-            vocab_size,
-            hidden_size=768,
-            num_hidden_layers=12,
-            num_attention_heads=12,
-            intermediate_size=3072,
-            hidden_act="gelu",
-            hidden_dropout_prob=0.1,
-            attention_probs_dropout_prob=0.1,
-            normalize_before=True,
-            max_position_embeddings=512,
-            type_vocab_size=2,
-            initializer_range=0.02,
-            unk_token_id=0,
-            pad_token_id=0,
-            bos_token_id=1,
-            eos_token_id=2,
-            mask_token_id=30000, ):
+    def __init__(self,
+                 vocab_size,
+                 hidden_size=768,
+                 num_hidden_layers=12,
+                 num_attention_heads=12,
+                 intermediate_size=3072,
+                 hidden_act="gelu",
+                 hidden_dropout_prob=0.1,
+                 attention_probs_dropout_prob=0.1,
+                 normalize_before=True,
+                 max_position_embeddings=512,
+                 type_vocab_size=2,
+                 initializer_range=0.02,
+                 unk_token_id=0,
+                 pad_token_id=0,
+                 bos_token_id=1,
+                 eos_token_id=2,
+                 mask_token_id=30000,
+                 role_type_size=None):
         super(UnifiedTransformerModel, self).__init__()
         self.unk_token_id = unk_token_id
         self.pad_token_id = pad_token_id
@@ -248,9 +310,12 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
         self.mask_token_id = mask_token_id
         self.initializer_range = initializer_range
 
-        self.embeddings = UnifiedTransformerEmbeddings(
-            vocab_size, hidden_size, hidden_dropout_prob,
-            max_position_embeddings, type_vocab_size)
+        self.embeddings = UnifiedTransformerEmbeddings(vocab_size, hidden_size,
+                                                       hidden_dropout_prob,
+                                                       max_position_embeddings,
+                                                       type_vocab_size,
+                                                       role_type_size,
+                                                       self.pad_token_id)
         encoder_layer = nn.TransformerEncoderLayer(
             hidden_size,
             num_attention_heads,
@@ -265,13 +330,20 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
                                              encoder_norm)
         self.apply(self.init_weights)
 
+    def get_input_embeddings(self):
+        return self.embeddings.word_embeddings
+
+    def set_input_embeddings(self, value):
+        self.embeddings.word_embeddings = value
+
     def forward(self,
                 input_ids,
-                token_type_ids,
-                position_ids,
-                attention_mask,
+                token_type_ids=None,
+                position_ids=None,
+                attention_mask=None,
                 use_cache=False,
-                cache=None):
+                cache=None,
+                role_ids=None):
         r"""
         The UnifiedTransformerModel forward method, overrides the special 
         :meth:`__call__` method.
@@ -316,6 +388,10 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
                 method. See :meth:`paddle.nn.TransformerEncoder.gen_cache` 
                 method for more details. It is only used for inference and 
                 should be None for training. Defaults to None.
+            role_ids (Tensor, optional):
+                Indices of role ids indicated different roles.
+                 It's data type should be `int64` and has a shape of 
+                [batch_size, sequence_length]. Defaults to None.
 
         Returns:
             Tensor|tuple: If `use_cache` is False, it is a tensor 
@@ -344,9 +420,15 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
                     is_split_into_words=False)
                 outputs = model(**inputs)
         """
+        if attention_mask is None:
+            attention_mask = ((input_ids == self.pad_token_id).astype(
+                paddle.get_default_dtype()) * -1e4).unsqueeze([1, 2])
+            attention_mask.stop_gradient = True
 
-        embedding_output = self.embeddings(input_ids, token_type_ids,
-                                           position_ids)
+        embedding_output = self.embeddings(input_ids,
+                                           token_type_ids,
+                                           position_ids,
+                                           role_ids=role_ids)
         if use_cache:
             if cache is None:
                 cache = self.encoder.gen_cache(embedding_output)
@@ -360,6 +442,7 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
 
 
 class UnifiedTransformerLMHead(nn.Layer):
+
     def __init__(self,
                  hidden_size,
                  vocab_size,
@@ -385,9 +468,9 @@ class UnifiedTransformerLMHead(nn.Layer):
         hidden_states = self.transform(hidden_states)
         hidden_states = self.activation(hidden_states)
         hidden_states = self.layer_norm(hidden_states)
-        logits = paddle.tensor.matmul(
-            hidden_states, self.decoder_weight,
-            transpose_y=True) + self.decoder_bias
+        logits = paddle.tensor.matmul(hidden_states,
+                                      self.decoder_weight,
+                                      transpose_y=True) + self.decoder_bias
         return logits
 
 
@@ -413,12 +496,13 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
 
     def forward(self,
                 input_ids,
-                token_type_ids,
-                position_ids,
-                attention_mask,
+                token_type_ids=None,
+                position_ids=None,
+                attention_mask=None,
                 masked_positions=None,
                 use_cache=False,
-                cache=None):
+                cache=None,
+                role_ids=None):
         r"""
         The UnifiedTransformerLMHeadModel forward method, overrides the special 
         :meth:`__call__` method.
@@ -435,6 +519,8 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
             use_cache: (bool, optional): 
                 See :class:`UnifiedTransformerModel`.
             cache (list, optional): 
+                See :class:`UnifiedTransformerModel`.
+            role_ids: (Tensor, optional):
                 See :class:`UnifiedTransformerModel`.
 
         Returns:
@@ -465,9 +551,13 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
                 logits = model(**inputs)
         """
 
-        outputs = self.unified_transformer(input_ids, token_type_ids,
-                                           position_ids, attention_mask,
-                                           use_cache, cache)
+        outputs = self.unified_transformer(input_ids,
+                                           token_type_ids,
+                                           position_ids,
+                                           attention_mask,
+                                           use_cache,
+                                           cache,
+                                           role_ids=role_ids)
         sequence_output = outputs[0] if use_cache else outputs
         logits = self.lm_head(sequence_output, masked_positions)
         if use_cache:
@@ -501,25 +591,62 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
 
     def adjust_logits_during_generation(self, logits):
         # pre-process distribution
-        logits[:, self.unified_transformer.unk_token_id] = -1e9
-        logits[:, self.unified_transformer.bos_token_id] = -1e9
-        logits[:, self.unified_transformer.mask_token_id] = -1e9
+        logits[:, self.unified_transformer.unk_token_id] = -1e4
+        logits[:, self.unified_transformer.bos_token_id] = -1e4
+        logits[:, self.unified_transformer.mask_token_id] = -1e4
         return logits
 
     def prepare_inputs_for_generation(self,
                                       input_ids,
-                                      token_type_ids,
-                                      position_ids,
-                                      attention_mask,
+                                      token_type_ids=None,
+                                      position_ids=None,
+                                      attention_mask=None,
                                       use_cache=False,
                                       cache=None,
                                       **kwargs):
+
+        role_ids = kwargs.get("role_ids", None)
+
+        if position_ids is None:
+            if self.pad_token_id is None:
+                position_ids = paddle.expand_as(
+                    paddle.arange(end=paddle.shape(input_ids)[1],
+                                  dtype="int64"), input_ids)
+            else:
+                # NOTE: If there is a unk_token_id in input_ids, the following logic is wrong.
+                # In that case, the position_ids must be provided.
+                # And this is for left padding input_ids.
+                num_pad = paddle.sum(
+                    (input_ids == self.pad_token_id).astype("float32"),
+                    axis=-1,
+                    keepdim=True)
+                position_ids = F.relu(
+                    paddle.expand_as(
+                        paddle.arange(end=paddle.shape(input_ids)[1],
+                                      dtype="float32"), input_ids) -
+                    num_pad).astype("int64")
+            position_ids.stop_gradient = True
+
+        if token_type_ids is None:
+            token_type_ids = paddle.zeros_like(input_ids, dtype="int64")
+            token_type_ids.stop_gradient = True
+
+        if attention_mask is None:
+            attention_mask = ((input_ids == self.pad_token_id).astype(
+                paddle.get_default_dtype()) * -1e4).unsqueeze([1, 2])
+            attention_mask.stop_gradient = True
+
         # only last token for inputs_ids if cache is defined in kwargs
         if cache is not None:
-            input_ids = input_ids[:, -1].unsqueeze(-1)
-            token_type_ids = token_type_ids[:, -1].unsqueeze(-1)
-            position_ids = position_ids[:, -1].unsqueeze(-1)
-            attention_mask = attention_mask[:, :, -1, :].unsqueeze(2)
+            input_ids = input_ids[:, -1:]
+            if token_type_ids is not None:
+                token_type_ids = token_type_ids[:, -1:]
+            if position_ids is not None:
+                position_ids = position_ids[:, -1:]
+            if role_ids is not None:
+                role_ids = role_ids[:, -1:]
+        if attention_mask is not None:
+            attention_mask = attention_mask[:, :, -1:, :]
 
         return {
             "input_ids": input_ids,
@@ -527,7 +654,8 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
             "position_ids": position_ids,
             "attention_mask": attention_mask,
             "use_cache": use_cache,
-            "cache": cache
+            "cache": cache,
+            "role_ids": role_ids
         }
 
     def __getattr__(self, name):

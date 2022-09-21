@@ -17,6 +17,12 @@ import paddle.nn as nn
 
 from ..ernie.modeling import ErniePooler
 from .. import PretrainedModel, register_base_model
+from ..model_outputs import (
+    BaseModelOutputWithPooling,
+    SequenceClassifierOutput,
+    TokenClassifierOutput,
+    QuestionAnsweringModelOutput,
+)
 
 __all__ = [
     'ErnieGramModel',
@@ -43,8 +49,9 @@ class ErnieGramEmbeddings(nn.Layer):
                  num_attention_heads=None):
         super(ErnieGramEmbeddings, self).__init__()
 
-        self.word_embeddings = nn.Embedding(
-            vocab_size, emb_size, padding_idx=pad_token_id)
+        self.word_embeddings = nn.Embedding(vocab_size,
+                                            emb_size,
+                                            padding_idx=pad_token_id)
         self.position_embeddings = nn.Embedding(max_position_embeddings,
                                                 emb_size)
         self.token_type_embeddings = nn.Embedding(type_vocab_size, emb_size)
@@ -83,7 +90,6 @@ class ErnieGramPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "ernie-gram-zh": {
             "attention_probs_dropout_prob": 0.1,
@@ -98,12 +104,26 @@ class ErnieGramPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "vocab_size": 18018
         },
+        "ernie-gram-zh-finetuned-dureader-robust": {
+            "attention_probs_dropout_prob": 0.1,
+            "emb_size": 768,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "type_vocab_size": 2,
+            "vocab_size": 18018
+        },
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "ernie-gram-zh":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_gram_zh/ernie_gram_zh.pdparams",
+            "ernie-gram-zh-finetuned-dureader-robust":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gram-zh-finetuned-dureader-robust/model_state.pdparams",
         },
     }
     base_model_prefix = "ernie_gram"
@@ -117,8 +137,8 @@ class ErnieGramPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range") else
+                        std=self.initializer_range if hasattr(
+                            self, "initializer_range") else
                         self.ernie_gram.config["initializer_range"],
                         shape=layer.weight.shape))
         elif isinstance(layer, nn.LayerNorm):
@@ -202,9 +222,11 @@ class ErnieGramModel(ErnieGramPretrainedModel):
         super(ErnieGramModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
-        self.embeddings = ErnieGramEmbeddings(
-            vocab_size, emb_size, hidden_dropout_prob, max_position_embeddings,
-            type_vocab_size, pad_token_id, rel_pos_size, num_attention_heads)
+        self.embeddings = ErnieGramEmbeddings(vocab_size, emb_size,
+                                              hidden_dropout_prob,
+                                              max_position_embeddings,
+                                              type_vocab_size, pad_token_id,
+                                              rel_pos_size, num_attention_heads)
         encoder_layer = nn.TransformerEncoderLayer(
             hidden_size,
             num_attention_heads,
@@ -221,7 +243,10 @@ class ErnieGramModel(ErnieGramPretrainedModel):
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
         Args:
             input_ids (Tensor):
@@ -254,6 +279,15 @@ class ErnieGramModel(ErnieGramPretrainedModel):
                 We use whole-word-mask in ERNIE, so the whole word will have the same value. For example, "使用" as a word,
                 "使" and "用" will have the same value.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.ModelOutput` object. If `False`, the output
+                will be a tuple of tensors. Defaults to `False`.
 
         Returns:
             tuple: Returns tuple (``sequence_output``, ``pooled_output``).
@@ -285,17 +319,42 @@ class ErnieGramModel(ErnieGramPretrainedModel):
         """
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
-                (input_ids == self.pad_token_id
-                 ).astype(self.pooler.dense.weight.dtype) * -1e4,
+                (input_ids == self.pad_token_id).astype(
+                    self.pooler.dense.weight.dtype) * -1e4,
                 axis=[1, 2])
-        embedding_output = self.embeddings(
-            input_ids=input_ids,
-            position_ids=position_ids,
-            token_type_ids=token_type_ids)
-        encoder_outputs = self.encoder(embedding_output, attention_mask)
-        sequence_output = encoder_outputs
+        # For 2D attention_mask from tokenizer
+        elif attention_mask.ndim == 2:
+            attention_mask = paddle.unsqueeze(
+                attention_mask, axis=[1,
+                                      2]).astype(self.pooler.dense.weight.dtype)
+            attention_mask = (1.0 - attention_mask) * -1e4
+        attention_mask.stop_gradient = True
+
+        embedding_output = self.embeddings(input_ids=input_ids,
+                                           position_ids=position_ids,
+                                           token_type_ids=token_type_ids)
+        encoder_outputs = self.encoder(
+            embedding_output,
+            attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict)
+
+        if isinstance(encoder_outputs, type(input_ids)):
+            encoder_outputs = (encoder_outputs, )
+
+        sequence_output = encoder_outputs[0]
+
         pooled_output = self.pooler(sequence_output)
-        return sequence_output, pooled_output
+
+        if not return_dict:
+            return (sequence_output, pooled_output) + encoder_outputs[1:]
+
+        return BaseModelOutputWithPooling(
+            last_hidden_state=sequence_output,
+            pooler_output=pooled_output,
+            hidden_states=encoder_outputs.hidden_states,
+            attentions=encoder_outputs.attentions)
 
 
 class ErnieGramForTokenClassification(ErnieGramPretrainedModel):
@@ -318,8 +377,8 @@ class ErnieGramForTokenClassification(ErnieGramPretrainedModel):
         super(ErnieGramForTokenClassification, self).__init__()
         self.num_classes = num_classes
         self.ernie_gram = ernie_gram  # allow ernie_gram to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.ernie_gram.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  ernie_gram.config["hidden_dropout_prob"])
         initializer = nn.initializer.TruncatedNormal(
             std=self.ernie_gram.config['initializer_range'])
         self.classifier = nn.Linear(
@@ -334,7 +393,11 @@ class ErnieGramForTokenClassification(ErnieGramPretrainedModel):
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                labels=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
         Args:
             input_ids (Tensor):
@@ -345,6 +408,17 @@ class ErnieGramForTokenClassification(ErnieGramPretrainedModel):
                 See :class:`ErnieGramModel`.
             attention_mask (Tensor, optional):
                 See :class:`ErnieGramModel`.
+            labels (Tensor of shape `(batch_size, sequence_length)`, optional):
+                Labels for computing the token classification loss. Indices should be in `[0, ..., num_classes - 1]`.
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
             Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
@@ -363,15 +437,35 @@ class ErnieGramForTokenClassification(ErnieGramPretrainedModel):
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
         """
-        sequence_output, _ = self.ernie_gram(
-            input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask)
+        outputs = self.ernie_gram(input_ids,
+                                  token_type_ids=token_type_ids,
+                                  position_ids=position_ids,
+                                  attention_mask=attention_mask,
+                                  output_attentions=output_attentions,
+                                  output_hidden_states=output_hidden_states,
+                                  return_dict=return_dict)
+
+        sequence_output = outputs[0]
 
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
-        return logits
+
+        loss = None
+        if labels is not None:
+            loss_fct = paddle.nn.CrossEntropyLoss()
+            loss = loss_fct(logits.reshape((-1, self.num_classes)),
+                            labels.reshape((-1, )))
+        if not return_dict:
+            output = (logits, ) + outputs[2:]
+            return ((loss, ) + output) if loss is not None else (
+                output[0] if len(output) == 1 else output)
+
+        return TokenClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 
 class ErnieGramForQuestionAnswering(ErnieGramPretrainedModel):
@@ -395,7 +489,12 @@ class ErnieGramForQuestionAnswering(ErnieGramPretrainedModel):
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                start_positions=None,
+                end_positions=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
         Args:
             input_ids (Tensor):
@@ -406,6 +505,23 @@ class ErnieGramForQuestionAnswering(ErnieGramPretrainedModel):
                 See :class:`ErnieGramModel`.
             attention_mask (Tensor, optional):
                 See :class:`ErnieGramModel`.
+            start_positions (Tensor of shape `(batch_size,)`, optional):
+                Labels for position (index) of the start of the labelled span for computing the token classification loss.
+                Positions are clamped to the length of the sequence (`sequence_length`). Position outside of the sequence
+                are not taken into account for computing the loss.
+            end_positions (Tensor of shape `(batch_size,)`, optional):
+                Labels for position (index) of the end of the labelled span for computing the token classification loss.
+                Positions are clamped to the length of the sequence (`sequence_length`). Position outside of the sequence
+                are not taken into account for computing the loss.
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
 
         Returns:
@@ -435,17 +551,47 @@ class ErnieGramForQuestionAnswering(ErnieGramPretrainedModel):
                 logits = model(**inputs)
         """
 
-        sequence_output, _ = self.ernie_gram(
-            input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask)
+        outputs = self.ernie_gram(input_ids,
+                                  token_type_ids=token_type_ids,
+                                  position_ids=position_ids,
+                                  attention_mask=attention_mask,
+                                  output_attentions=output_attentions,
+                                  output_hidden_states=output_hidden_states,
+                                  return_dict=return_dict)
 
-        logits = self.classifier(sequence_output)
+        logits = self.classifier(outputs[0])
         logits = paddle.transpose(logits, perm=[2, 0, 1])
         start_logits, end_logits = paddle.unstack(x=logits, axis=0)
 
-        return start_logits, end_logits
+        total_loss = None
+        if start_positions is not None and end_positions is not None:
+            # If we are on multi-GPU, split add a dimension
+            if start_positions.ndim > 1:
+                start_positions = start_positions.squeeze(-1)
+            if start_positions.ndim > 1:
+                end_positions = end_positions.squeeze(-1)
+            # sometimes the start/end positions are outside our model inputs, we ignore these terms
+            ignored_index = paddle.shape(start_logits)[1]
+            start_positions = start_positions.clip(0, ignored_index)
+            end_positions = end_positions.clip(0, ignored_index)
+
+            loss_fct = paddle.nn.CrossEntropyLoss(ignore_index=ignored_index)
+            start_loss = loss_fct(start_logits, start_positions)
+            end_loss = loss_fct(end_logits, end_positions)
+            total_loss = (start_loss + end_loss) / 2
+
+        if not return_dict:
+            output = (start_logits, end_logits) + outputs[2:]
+            return ((total_loss, ) +
+                    output) if total_loss is not None else output
+
+        return QuestionAnsweringModelOutput(
+            loss=total_loss,
+            start_logits=start_logits,
+            end_logits=end_logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 
 class ErnieGramForSequenceClassification(ErnieGramPretrainedModel):
@@ -468,8 +614,8 @@ class ErnieGramForSequenceClassification(ErnieGramPretrainedModel):
         super(ErnieGramForSequenceClassification, self).__init__()
         self.num_classes = num_classes
         self.ernie_gram = ernie_gram  # allow ernie gram to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.ernie_gram.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  ernie_gram.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.ernie_gram.config["hidden_size"],
                                     num_classes)
         self.apply(self.init_weights)
@@ -478,7 +624,11 @@ class ErnieGramForSequenceClassification(ErnieGramPretrainedModel):
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                labels=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
         Args:
             input_ids (Tensor):
@@ -488,7 +638,22 @@ class ErnieGramForSequenceClassification(ErnieGramPretrainedModel):
             position_ids (Tensor, optional):
                 See :class:`ErnieGramModel`.
             attention_mask (Tensor, optional):
-                See :class:`ErnieGramModel`.
+                See :class:`BertModel`.
+            labels (Tensor of shape `(batch_size,)`, optional):
+                Labels for computing the sequence classification/regression loss.
+                Indices should be in `[0, ..., num_classes - 1]`. If `num_classes == 1`
+                a regression loss is computed (Mean-Square loss), If `num_classes > 1`
+                a classification loss is computed (Cross-Entropy).
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
+
 
         Returns:
             Tensor: Returns tensor `logits`, a tensor of the input text classification logits.
@@ -508,12 +673,40 @@ class ErnieGramForSequenceClassification(ErnieGramPretrainedModel):
                 logits = model(**inputs)
 
         """
-        _, pooled_output = self.ernie_gram(
-            input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask)
+        outputs = self.ernie_gram(input_ids,
+                                  token_type_ids=token_type_ids,
+                                  position_ids=position_ids,
+                                  attention_mask=attention_mask,
+                                  output_attentions=output_attentions,
+                                  output_hidden_states=output_hidden_states,
+                                  return_dict=return_dict)
 
-        pooled_output = self.dropout(pooled_output)
+        pooled_output = self.dropout(outputs[1])
         logits = self.classifier(pooled_output)
-        return logits
+
+        logits = self.classifier(pooled_output)
+
+        loss = None
+        if labels is not None:
+            if self.num_classes == 1:
+                loss_fct = paddle.nn.MSELoss()
+                loss = loss_fct(logits, labels)
+            elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
+                loss_fct = paddle.nn.CrossEntropyLoss()
+                loss = loss_fct(logits.reshape((-1, self.num_classes)),
+                                labels.reshape((-1, )))
+            else:
+                loss_fct = paddle.nn.BCEWithLogitsLoss()
+                loss = loss_fct(logits, labels)
+
+        if not return_dict:
+            output = (logits, ) + outputs[2:]
+            return ((loss, ) + output) if loss is not None else (
+                output[0] if len(output) == 1 else output)
+
+        return SequenceClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )

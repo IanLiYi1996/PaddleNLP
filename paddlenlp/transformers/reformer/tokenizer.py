@@ -12,10 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from paddle.utils import try_import
+import sentencepiece as spm
+
 from ..albert.tokenizer import AlbertEnglishTokenizer
 
 __all__ = ['ReformerTokenizer']
+
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+    "reformer-enwik8": 65536,
+    "reformer-crime-and-punishment": 524288
+}
 
 
 class ReformerTokenizer(AlbertEnglishTokenizer):
@@ -48,7 +54,9 @@ class ReformerTokenizer(AlbertEnglishTokenizer):
 
     """
 
-    resource_files_names = {"sentencepiece_model_file": "spiece.model", }
+    resource_files_names = {
+        "sentencepiece_model_file": "spiece.model",
+    }
     pretrained_resource_files_map = {
         "sentencepiece_model_file": {
             "reformer-crime-and-punishment":
@@ -61,6 +69,8 @@ class ReformerTokenizer(AlbertEnglishTokenizer):
             "do_lower_case": False
         },
     }
+
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __init__(self,
                  sentencepiece_model_file,
@@ -76,8 +86,6 @@ class ReformerTokenizer(AlbertEnglishTokenizer):
         self.remove_space = remove_space
         self.keep_accents = keep_accents
         self.sentencepiece_model_file = sentencepiece_model_file
-
-        spm = try_import("sentencepiece")
         self.sp_model = spm.SentencePieceProcessor()
         self.sp_model.Load(sentencepiece_model_file)
 
