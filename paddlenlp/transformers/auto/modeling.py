@@ -55,6 +55,7 @@ MAPPING_NAMES = OrderedDict([
     ("ErnieDoc", "ernie_doc"),
     ("ErnieGen", "ernie_gen"),
     ("ErnieGram", "ernie_gram"),
+    ("ErnieLayout", "ernie_layout"),
     ("ErnieM", "ernie_m"),
     ("Ernie", "ernie"),
     ("FNet", "fnet"),
@@ -88,10 +89,13 @@ MAPPING_NAMES = OrderedDict([
     ("Bart", "bart"),
     ("GAUAlpha", "gau_alpha"),
     ("CodeGen", "codegen"),
+    ("CLIPVision", "clip"),
+    ("CLIPText", "clip"),
     ("CLIP", "clip"),
     ("Artist", "artist"),
     ("OPT", 'opt'),
     ("ErnieViL", 'ernie_vil'),
+    ("Pegasus", 'pegasus'),
 ])
 
 MAPPING_TASKS = OrderedDict([
@@ -266,9 +270,10 @@ class _BaseAutoModelClass:
                     pretrained_model_name_or_path, *model_args, **kwargs)
         # Assuming from community-contributed pretrained models
         else:
-            community_config_path = os.path.join(COMMUNITY_MODEL_PREFIX,
-                                                 pretrained_model_name_or_path,
-                                                 cls.model_config_file)
+            community_config_path = "/".join([
+                COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path,
+                cls.model_config_file
+            ])
 
             default_root = os.path.join(MODEL_HOME,
                                         pretrained_model_name_or_path)

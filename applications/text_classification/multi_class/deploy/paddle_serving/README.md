@@ -21,7 +21,8 @@
 
 ### 安装PaddleNLP
 
-安装PaddleNLP默认开启百度镜像源来加速下载，如果您使用 HTTP 代理可以关闭(删去 -i https://mirror.baidu.com/pypi/simple)，更多关于PaddleNLP安装的详细教程请查见[PaddleNLP快速安装](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/get_started/installation.rst)。
+
+安装PaddleNLP默认开启百度镜像源来加速下载，如果您使用 HTTP 代理可以删去` -i https://mirror.baidu.com/pypi/simple` ，更多关于PaddleNLP安装的详细教程请查见[PaddleNLP快速安装](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/get_started/installation.rst)。
 
 ```shell
 python3 -m pip install --upgrade paddlenlp -i https://mirror.baidu.com/pypi/simple
@@ -52,10 +53,10 @@ pip install paddle-serving-server-gpu==0.8.3.post112 -i https://pypi.tuna.tsingh
 - 更多wheel包请参考[serving官网文档](https://github.com/PaddlePaddle/Serving/blob/develop/doc/Latest_Packages_CN.md)
 
 
-### 安装FasterTokenizer文本处理加速库（可选）
-推荐安装faster_tokenizer可以得到更极致的文本处理效率，进一步提升服务性能。
+### 安装FastTokenizer文本处理加速库（可选）
+推荐安装fast_tokenizer可以得到更极致的文本处理效率，进一步提升服务性能。
 ```shell
-pip install faster_tokenizer
+pip install fast_tokenizer
 ```
 
 
@@ -142,17 +143,42 @@ I0628 09:12:30.739985 74305 analysis_predictor.cc:1007] ======= optimize end ===
 I0628 09:12:30.776288 74305 naive_executor.cc:102] ---  skip [feed], feed -> token_type_ids
 I0628 09:12:30.779004 74305 naive_executor.cc:102] ---  skip [feed], feed -> input_ids
 I0628 09:12:30.787542 74305 naive_executor.cc:102] ---  skip [linear_147.tmp_1], fetch -> fetch
-[2022-06-28 09:12:32,879] [ WARNING] - Can't find the faster_tokenizers package, please ensure install faster_tokenizers correctly. You can install faster_tokenizers by `pip install faster_tokenizers`(Currently only work for linux platform).
+[2022-06-28 09:12:32,879] [ WARNING] - Can't find the fast_tokenizer package, please ensure install fast_tokenizer correctly. You can install fast_tokenizer by `pip install fast_tokenizer`.
 [2022-06-28 09:12:32,880] [    INFO] - We are using <class 'paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer'> to load 'ernie-3.0-medium-zh'.
 [2022-06-28 09:12:32,880] [    INFO] - Already cached /root/.paddlenlp/models/ernie-3.0-medium-zh/ernie_3.0_base_zh_vocab.txt
 [OP Object] init success
 
 ```
 
-#### 启动client测试
+#### 启动rpc client测试
 注意执行客户端请求时关闭代理，并根据实际情况修改server_url地址(启动服务所在的机器)
 ```shell
 python rpc_client.py
+```
+输出打印如下:
+```
+data:  黑苦荞茶的功效与作用及食用方法
+label:  功效作用
+--------------------
+data:  交界痣会凸起吗
+label:  疾病表述
+--------------------
+data:  检查是否能怀孕挂什么科
+label:  就医建议
+--------------------
+data:  鱼油怎么吃咬破吃还是直接咽下去
+label:  其他
+--------------------
+data:  幼儿挑食的生理原因是
+label:  病因分析
+--------------------
+
+```
+
+#### 启动http client测试
+注意执行客户端请求时关闭代理，并根据实际情况修改server_url地址(启动服务所在的机器)
+```shell
+python http_client.py
 ```
 输出打印如下:
 ```

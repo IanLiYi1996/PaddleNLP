@@ -533,7 +533,7 @@ def quick_gelu(x):
 
 F.quick_gelu = quick_gelu
 
-NEG_INF = float("-inf")  # -1e4 -1e9
+NEG_INF = -1e4  # float("-inf") -1e4 -1e9
 
 
 class VisionTransformer(nn.Layer):
@@ -1119,6 +1119,12 @@ class CLIPTextModel(CLIPTextPretrainedModel):
                                           normalize_before=True)
         self.apply(self._init_weights)
 
+    def get_input_embeddings(self) -> nn.Layer:
+        return self.text_model.token_embedding
+
+    def set_input_embeddings(self, value):
+        self.text_model.token_embedding = value
+
     def forward(
         self,
         input_ids=None,
@@ -1261,6 +1267,9 @@ class CLIPVisionModel(CLIPVisionPretrainedModel):
                                               normalize_before=True)
 
         self.apply(self._init_weights)
+
+    def get_input_embeddings(self) -> nn.Layer:
+        return self.vision_model.conv1
 
     def forward(
         self,

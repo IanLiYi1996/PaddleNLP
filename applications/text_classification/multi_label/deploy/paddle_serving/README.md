@@ -21,7 +21,7 @@
 
 ### 安装PaddleNLP
 
-安装PaddleNLP默认开启百度镜像源来加速下载，如果您使用 HTTP 代理可以关闭(删去 -i https://mirror.baidu.com/pypi/simple)，更多关于PaddleNLP安装的详细教程请查见[PaddleNLP快速安装](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/get_started/installation.rst)。
+安装PaddleNLP默认开启百度镜像源来加速下载，如果您使用 HTTP 代理可以删去` -i https://mirror.baidu.com/pypi/simple` ，更多关于PaddleNLP安装的详细教程请查见[PaddleNLP快速安装](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/get_started/installation.rst)。
 
 ```shell
 python3 -m pip install --upgrade paddlenlp -i https://mirror.baidu.com/pypi/simple
@@ -51,10 +51,10 @@ pip install paddle-serving-server-gpu==0.8.3.post112 -i https://pypi.tuna.tsingh
 - 默认开启国内清华镜像源来加速下载，如果您使用 HTTP 代理可以关闭(-i https://pypi.tuna.tsinghua.edu.cn/simple)
 - 更多wheel包请参考[serving官网文档](https://github.com/PaddlePaddle/Serving/blob/develop/doc/Latest_Packages_CN.md)
 
-### 安装FasterTokenizer文本处理加速库（可选）
-推荐安装faster_tokenizer可以得到更极致的文本处理效率，进一步提升服务性能。
+### 安装FastTokenizer文本处理加速库（可选）
+推荐安装fast_tokenizer可以得到更极致的文本处理效率，进一步提升服务性能。
 ```shell
-pip install faster_tokenizer
+pip install fast_tokenizer
 ```
 
 
@@ -142,7 +142,7 @@ I0625 16:44:36.563802 40218 analysis_predictor.cc:1007] ======= optimize end ===
 I0625 16:44:36.571702 40218 naive_executor.cc:102] ---  skip [feed], feed -> token_type_ids
 I0625 16:44:36.571728 40218 naive_executor.cc:102] ---  skip [feed], feed -> input_ids
 I0625 16:44:36.574352 40218 naive_executor.cc:102] ---  skip [linear_147.tmp_1], fetch -> fetch
-[2022-06-25 16:44:37,545] [ WARNING] - Can't find the faster_tokenizers package, please ensure install faster_tokenizers correctly. You can install faster_tokenizers by `pip install faster_tokenizers`(Currently only work for linux platform).
+[2022-06-25 16:44:37,545] [ WARNING] - Can't find the fast_tokenizer package, please ensure install fast_tokenizer correctly. You can install fast_tokenizer by `pip install fast_tokenizer`.
 [2022-06-25 16:44:37,546] [    INFO] - We are using <class 'paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer'> to load 'ernie-3.0-medium-zh'.
 [2022-06-25 16:44:37,546] [    INFO] - Already cached /root/.paddlenlp/models/ernie-3.0-medium-zh/ernie_3.0_base_zh_vocab.txt
 [OP Object] init success
@@ -150,7 +150,7 @@ W0625 16:45:40.312942 40218 gpu_context.cc:278] Please NOTE: device: 3, GPU Comp
 W0625 16:45:40.316538 40218 gpu_context.cc:306] device: 3, cuDNN Version: 8.1.
 ```
 
-#### 启动client测试
+#### 启动rpc client测试
 注意执行客户端请求时关闭代理，并根据实际情况修改server_url地址(启动服务所在的机器)
 ```shell
 python rpc_client.py
@@ -158,14 +158,33 @@ python rpc_client.py
 输出打印如下:
 ```
 data:  五松新村房屋是被告婚前购买的；
-label:  10
+label:  婚前个人财产
 --------------------
 data:  被告于2016年3月将车牌号为皖B×××××出售了2.7万元，被告通过原告偿还了齐荷花人民币2.6万元，原、被告尚欠齐荷花2万元。
-label:  2,9
+label:  有夫妻共同财产,有夫妻共同债务
 --------------------
 data:  2、判令被告返还借婚姻索取的现金33万元，婚前个人存款10万元；
-label:  10
+label:  婚前个人财产
 --------------------
 data:  一、判决原告于某某与被告杨某某离婚；
-label:  8,11
+label:  准予离婚,法定离婚
+```
+#### 启动http client测试
+注意执行客户端请求时关闭代理，并根据实际情况修改server_url地址(启动服务所在的机器)
+```shell
+python http_client.py
+```
+输出打印如下:
+```
+data:  五松新村房屋是被告婚前购买的；
+label:  婚前个人财产
+--------------------
+data:  被告于2016年3月将车牌号为皖B×××××出售了2.7万元，被告通过原告偿还了齐荷花人民币2.6万元，原、被告尚欠齐荷花2万元。
+label:  有夫妻共同财产,有夫妻共同债务
+--------------------
+data:  2、判令被告返还借婚姻索取的现金33万元，婚前个人存款10万元；
+label:  婚前个人财产
+--------------------
+data:  一、判决原告于某某与被告杨某某离婚；
+label:  准予离婚,法定离婚
 ```
