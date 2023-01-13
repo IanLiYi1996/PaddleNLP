@@ -12,30 +12,98 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+# flake8: noqa
 
-from ..utils import is_onnx_available, is_paddle_available, is_paddlenlp_available
+from ..utils import (
+    OptionalDependencyNotAvailable,
+    is_fastdeploy_available,
+    is_k_diffusion_available,
+    is_librosa_available,
+    is_paddle_available,
+    is_paddlenlp_available,
+)
 
-if is_paddle_available():
+try:
+    if not is_paddle_available():
+        raise OptionalDependencyNotAvailable()
+except OptionalDependencyNotAvailable:
+    from ..utils.dummy_paddle_objects import *  # noqa F403
+else:
+    from .dance_diffusion import DanceDiffusionPipeline
     from .ddim import DDIMPipeline
     from .ddpm import DDPMPipeline
+    from .latent_diffusion import LDMSuperResolutionPipeline
     from .latent_diffusion_uncond import LDMPipeline
     from .pndm import PNDMPipeline
+    from .repaint import RePaintPipeline
     from .score_sde_ve import ScoreSdeVePipeline
     from .stochastic_karras_ve import KarrasVePipeline
+
+
+try:
+    if not (is_paddle_available() and is_librosa_available()):
+        raise OptionalDependencyNotAvailable()
+except OptionalDependencyNotAvailable:
+    from ..utils.dummy_paddle_and_librosa_objects import *  # noqa F403
 else:
-    from ..utils.dummy_paddle_objects import *  # noqa F403
+    from .audio_diffusion import AudioDiffusionPipeline, Mel
 
-if is_paddle_available() and is_paddlenlp_available():
-    from .latent_diffusion import LDMTextToImagePipeline, LDMBertModel, LDMSuperResolutionPipeline
-    from .stable_diffusion import (StableDiffusionImg2ImgPipeline,
-                                   StableDiffusionInpaintPipeline,
-                                   StableDiffusionPipeline,
-                                   StableDiffusionInpaintPipelineLegacy,
-                                   StableDiffusionPipelineAllinOne)
-
-if is_paddlenlp_available() and is_onnx_available():
-    from .stable_diffusion import (
-        OnnxStableDiffusionImg2ImgPipeline,
-        OnnxStableDiffusionInpaintPipeline,
-        OnnxStableDiffusionPipeline,
+try:
+    if not (is_paddle_available() and is_paddlenlp_available()):
+        raise OptionalDependencyNotAvailable()
+except OptionalDependencyNotAvailable:
+    from ..utils.dummy_paddle_and_paddlenlp_objects import *  # noqa F403
+else:
+    from .alt_diffusion import (
+        AltDiffusionImg2ImgPipeline,
+        AltDiffusionPipeline,
+        RobertaSeriesModelWithTransformation,
     )
+    from .latent_diffusion import (
+        LDMBertModel,
+        LDMSuperResolutionPipeline,
+        LDMTextToImagePipeline,
+    )
+    from .paint_by_example import PaintByExamplePipeline
+    from .stable_diffusion import (
+        CycleDiffusionPipeline,
+        StableDiffusionDepth2ImgPipeline,
+        StableDiffusionImageVariationPipeline,
+        StableDiffusionImg2ImgPipeline,
+        StableDiffusionInpaintPipeline,
+        StableDiffusionInpaintPipelineLegacy,
+        StableDiffusionMegaPipeline,
+        StableDiffusionPipeline,
+        StableDiffusionPipelineAllinOne,
+        StableDiffusionUpscalePipeline,
+    )
+    from .stable_diffusion_safe import StableDiffusionPipelineSafe
+    from .unclip import UnCLIPPipeline
+    from .versatile_diffusion import (
+        VersatileDiffusionDualGuidedPipeline,
+        VersatileDiffusionImageVariationPipeline,
+        VersatileDiffusionPipeline,
+        VersatileDiffusionTextToImagePipeline,
+    )
+    from .vq_diffusion import VQDiffusionPipeline
+
+try:
+    if not (is_paddle_available() and is_paddlenlp_available() and is_fastdeploy_available()):
+        raise OptionalDependencyNotAvailable()
+except OptionalDependencyNotAvailable:
+    from ..utils.dummy_paddle_and_paddlenlp_and_fastdeploy_objects import *  # noqa F403
+else:
+    from .stable_diffusion import (
+        FastDeployStableDiffusionImg2ImgPipeline,
+        FastDeployStableDiffusionInpaintPipeline,
+        FastDeployStableDiffusionInpaintPipelineLegacy,
+        FastDeployStableDiffusionMegaPipeline,
+        FastDeployStableDiffusionPipeline,
+    )
+try:
+    if not (is_paddle_available() and is_paddlenlp_available() and is_k_diffusion_available()):
+        raise OptionalDependencyNotAvailable()
+except OptionalDependencyNotAvailable:
+    from ..utils.dummy_paddle_and_paddlenlp_and_k_diffusion_objects import *  # noqa F403
+else:
+    from .stable_diffusion import StableDiffusionKDiffusionPipeline
