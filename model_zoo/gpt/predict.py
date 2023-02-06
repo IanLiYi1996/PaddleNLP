@@ -67,6 +67,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "gpt-cn":
         demo = Demo("gpt-cn", "gpt-cpm-large-cn")
         demo.ask_question_cn("苹果的CEO是谁?")
+        demo.ask_question_cn("中国的成立日期?")
         demo.dictation_poetry_cn("举杯邀明月，")
     else:
         demo = Demo("gpt", "gpt2-medium-en")
