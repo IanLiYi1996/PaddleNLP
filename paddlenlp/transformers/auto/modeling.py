@@ -85,6 +85,7 @@ MAPPING_NAMES = OrderedDict(
         ("MobileBert", "mobilebert"),
         ("MPNet", "mpnet"),
         ("NeZha", "nezha"),
+        ("Nystromformer", "nystromformer"),
         ("PPMiniLM", "ppminilm"),
         ("ProphetNet", "prophetnet"),
         ("Reformer", "reformer"),
@@ -331,7 +332,9 @@ class _BaseAutoModelClass:
         # Assuming from community-contributed pretrained models
         else:
             default_root = (
-                cache_dir if cache_dir is not None else os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+                os.path.join(cache_dir, pretrained_model_name_or_path)
+                if cache_dir is not None
+                else os.path.join(MODEL_HOME, pretrained_model_name_or_path)
             )
             standard_community_url = "/".join(
                 [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.model_config_file]
