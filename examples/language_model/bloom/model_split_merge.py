@@ -20,9 +20,8 @@ import shutil
 import numpy as np
 import paddle
 
+from paddlenlp.transformers import BloomModel
 from paddlenlp.utils.env import MODEL_HOME
-
-__all__ = ["merge_model_parallel"]
 
 PREFIX_CHECKPOINT_DIR = "model_state"
 _re_checkpoint = re.compile(r"^" + PREFIX_CHECKPOINT_DIR + r"\_mp_(\d+)" + ".pdparams$")
@@ -105,9 +104,14 @@ def construct_sub_model_name_or_path(model_name_or_path, mp_degree, sharding_deg
 # TODO(wawltor) just support the model parallel
 def split_model_parallel(model_name_or_path, config, mp_degree, sharding_degree, as_float32=False):
     # Get the 3D rank
+    state_dict = None
     is_path = True if os.path.exists(model_name_or_path) else False
     if not is_path:
+        model_name = model_name_or_path
         model_name_or_path = os.path.join(MODEL_HOME, model_name_or_path)
+        if not os.path.exists(os.path.join(model_name_or_path, "model_state.pdparams")):
+            model = BloomModel.from_pretrained(model_name, low_cpu_mem_usage=True)
+            state_dict = model.state_dict()
 
     # Check the model split files exists
     sub_directory_name = construct_sub_model_name_or_path(model_name_or_path, mp_degree, sharding_degree)
@@ -126,7 +130,8 @@ def split_model_parallel(model_name_or_path, config, mp_degree, sharding_degree,
     if not os.path.exists(sub_directory_name):
         os.mkdir(sub_directory_name)
     # Generate the split files
-    state_dict = paddle.load(os.path.join(model_name_or_path, "model_state.pdparams"), return_numpy=True)
+    if state_dict is None:
+        state_dict = paddle.load(os.path.join(model_name_or_path, "model_state.pdparams"), return_numpy=True)
     state_dict_splits = [copy.deepcopy(state_dict) for i in range(0, mp_degree)]
     merged_keys = MergedKeys(config.n_layer)
     # reversed_merged_keys = dict(zip(merged_keys.values(), merged_keys.keys()))
@@ -156,16 +161,19 @@ def split_model_parallel(model_name_or_path, config, mp_degree, sharding_degree,
     return sub_directory_name
 
 
-def merge_model_parallel(model_name_or_path, config, as_float32=False):
+def merge_model_parallel(model_name_or_path: str, config, as_float32=False):
     # Get the 3D rank
     is_path = True if os.path.exists(model_name_or_path) else False
+    # 1. is model-name, eg: bigscience/bloom-560m
     if not is_path:
-        raise "Please input the path for the model"
+        return model_name_or_path
+
     weight_file_name = os.path.join(model_name_or_path, "model_state.pdparams")
+    # 2. dir for: /path/to/model_state.pdparams
     if os.path.exists(os.path.join(model_name_or_path, "model_state.pdparams")):
         return weight_file_name
 
-    # Collect the split files
+    # 3. collect the split files
     file_list = []
     for file_name in os.listdir(model_name_or_path):
         if file_name.count("model_state_mp") and file_name.count("pdparams"):
