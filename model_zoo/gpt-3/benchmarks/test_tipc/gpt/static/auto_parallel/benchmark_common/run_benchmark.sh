@@ -27,7 +27,7 @@ function _set_params(){
     run_mode=${8:-"DP"}             # (必选) MP模型并行|DP数据并行|PP流水线并行|混合并行DP1-MP1-PP1|DP2-MP8-PP2|DP1-MP8-PP4|DP4-MP8-PP1
     device_num=${9:-"N1C1"}         # (必选) 使用的卡数量，N1C1|N1C8|N4C32 （4机32卡）
     profiling=${PROFILING:-"false"}      # (必选) Profiling  开关，默认关闭，通过全局变量传递
-    model_repo="PaddleFleetX"          # (必选) 模型套件的名字
+    model_repo="PaddleNLP"          # (必选) 模型套件的名字
     speed_unit="samples/s"         # (必选)速度指标单位
     skip_steps=0                  # (必选)解析日志，跳过模型前几个性能不稳定的step
     keyword="ips:"                 # (必选)解析日志，筛选出性能数据所在行的关键字
@@ -37,7 +37,7 @@ function _set_params(){
     base_batch_size=$global_batch_size
     use_recompute=${11:-"False"}    # (可选)是否打开recompute
     verbose=${12:-"3"}         # (可选)是否打印性能数据
-    logging_freq=${13:-"100000"} # (可选)loss打印频率
+    logging_freq=${13:-"1"} # (可选)loss打印频率
     sharding_degree=${14:-"1"}      # (可选)
     sharding_stage=${15:-"1"}       # (可选)sharding case
     
@@ -80,14 +80,14 @@ function _train(){
     if [ ${mp_degree} -lt 8 -a ${pp_degree} -lt 8 ]; then num_attention_heads=4; fi #"gpt2-small-en"
     num_layers=24 #"gpt2-medium-en"
     if [ ${mp_degree} -lt 8 -a ${pp_degree} -lt 8 ]; then num_layers=4; fi #"gpt2-small-en"
-    use_pure_fp16="" # fp32
-    if [ "fp16" = ${fp_item} ]; then use_pure_fp16="o2"; fi
+    use_pure_fp16=False # fp32
+    if [ "fp16" = ${fp_item} ]; then use_pure_fp16=True; fi
     train_cmd="-o Global.seed=1234 \
                -o Global.local_batch_size=${local_batch_size} \
                -o Global.micro_batch_size=${micro_batch_size} \
                -o Engine.max_steps=${max_iter} \
                -o Engine.eval_freq=100000 \
-               -o Engine.mix_precision.level=${use_pure_fp16} \
+               -o Engine.mix_precision.enable=${use_pure_fp16} \
                -o Engine.save_load.save_steps=100000 \
                -o Model.hidden_size=1024 \
                -o Model.num_layers=${num_layers} \
@@ -122,12 +122,13 @@ function _train(){
         train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
             tools/auto.py -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_1.3B_dp8.yaml \
             ${train_cmd}"
-        workerlog_id_1=4
-        workerlog_id_2=6
+        workerlog_id_1=3
+        workerlog_id_2=7
         ;;
     *) echo "choose run_mode "; exit 1;
     esac
     cd ../
+    unset CUDA_MODULE_LOADING # fleet executor + CUDA_MODULE_LOADING=LAZY 容易hang
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
     if [[ ${model_item} =~ "CE" ]];then # CE精度-不限制执行时间
         ${train_cmd} > ${log_file} 2>&1
@@ -148,7 +149,8 @@ function _train(){
 }
 
 export PYTHONPATH=$(dirname "$PWD"):$PYTHONPATH
-
+sed -i "s/100:/1:/g" ${BENCHMARK_ROOT}/scripts/analysis.py 
+sed -i "s/100)/1)/g" ${BENCHMARK_ROOT}/scripts/analysis.py 
 source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合benchmark规范的log使用analysis.py 脚本进行性能数据解析;如果不联调只想要产出训练log可以注掉本行,提交时需打开
 _set_params $@
 #_train       # 如果只产出训练log,不解析,可取消注释

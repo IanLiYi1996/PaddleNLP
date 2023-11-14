@@ -195,7 +195,7 @@ class SentenceBackTranslate:
         num_beams (int): The number of beams in the "beam_search"
             strategy. Default to 4.
         use_faster: (bool): Whether to use faster entry of model
-            for FasterGeneration. Default to True.
+            for FasterGeneration. Default to False.
         decode_strategy (str, optional): The decoding strategy in generation.
             Currently, there are three decoding strategies supported:
             "greedy_search", "sampling" and "beam_search". Default to
@@ -209,7 +209,7 @@ class SentenceBackTranslate:
         max_length=128,
         batch_size=1,
         num_beams=4,
-        use_faster=True,
+        use_faster=False,
         decode_strategy="beam_search",
         from_model_name=None,
         to_model_name=None,
@@ -327,7 +327,7 @@ class SentenceBackTranslate:
                 use_faster=self.use_faster,
             )[0]
             for output in outputs:
-                eos = np.where(output.numpy() == eos_id)[0]
+                eos = np.where(output.cpu().numpy() == eos_id)[0]
                 if len(eos) == 0:
                     eos_pos = len(output) - 1
                 else:
@@ -501,7 +501,9 @@ class SentenceContinue:
         self.model = AutoModelForCausalLM.from_pretrained(self.model_name)
         self.model.eval()
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-        self.tokenizer.add_special_tokens({"pad_token": self.tokenizer.convert_ids_to_tokens(self.model.pad_token_id)})
+        self.tokenizer.add_special_tokens(
+            {"pad_token": self.tokenizer.convert_ids_to_tokens(self.model.config.pad_token_id)}
+        )
 
     def augment(self, sequences):
         """
@@ -535,8 +537,8 @@ class SentenceContinue:
                 top_p=self.top_p,
             )[0]
             for i in range(outputs.shape[0]):
-                output = outputs[i].numpy()
-                eos = np.where(output == model.eos_token_id)[0]
+                output = outputs[i].cpu().numpy()
+                eos = np.where(output == model.config.eos_token_id)[0]
                 if len(eos) == 0:
                     eos_pos = len(output) - 1
                 else:

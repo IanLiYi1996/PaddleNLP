@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from .bellegroup import *
 from .cail2018_small import *
 from .cblue import *
 from .chnsenticorp import *
@@ -26,6 +27,7 @@ from .drcd_cn import *
 from .dureader_robust import *
 from .glue import *
 from .imdb import *
+from .intokens_dataset import *
 from .lcqmc import *
 from .msra_ner import *
 from .nlpcc13_evsam05_hit import *

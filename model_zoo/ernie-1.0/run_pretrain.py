@@ -174,9 +174,10 @@ def get_train_data_file(args):
         files = [
             os.path.join(args.input_dir, f)
             for f in os.listdir(args.input_dir)
-            if (os.path.isfile(os.path.join(args.input_dir, f)) and "_idx.npz" in str(f))
+            if (os.path.isfile(os.path.join(args.input_dir, f)) and ("_idx.npz" in str(f) or ".idx" in str(f)))
         ]
         files = [x.replace("_idx.npz", "") for x in files]
+        files = [x.replace(".idx", "") for x in files]
 
         if len(files) > 1:
             ret = []
@@ -195,7 +196,8 @@ def all_gather(v):
         return v.item()
     ret = []
     dist.all_gather(ret, v)
-    concat = paddle.concat(ret, axis=0)
+    output_tensors = [t if len(t.shape) > 0 else t.reshape_([-1]) for t in ret]
+    concat = paddle.concat(output_tensors, axis=0)
     return concat.mean().item()
 
 

@@ -19,7 +19,7 @@ from pprint import pprint
 
 import paddle
 import yaml
-from attrdict import AttrDict
+from easydict import EasyDict as AttrDict
 from paddle import inference
 
 from paddlenlp.utils.log import logger
@@ -144,7 +144,7 @@ class Predictor(object):
             elif args.device == "xpu":
                 config.enable_xpu()
             elif args.device == "npu":
-                config.enable_npu()
+                config.enable_custom_device("npu")
             else:
                 # CPU
                 config.disable_gpu()

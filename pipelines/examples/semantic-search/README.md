@@ -153,7 +153,7 @@ export PIPELINE_YAML_PATH=rest_api/pipeline/semantic_search.yaml
 # 使用端口号 8891 启动模型服务
 python rest_api/application.py 8891
 ```
-Linux 用户推荐采用 Shell 脚本来启动服务：：
+Linux 用户推荐采用 Shell 脚本来启动服务：
 
 ```bash
 sh examples/semantic-search/run_search_server.sh
@@ -167,13 +167,16 @@ curl -X POST -k http://localhost:8891/query -H 'Content-Type: application/json' 
 更多API接口文档及其调用方式请参考链接[http://127.0.0.1:8891/docs](http://127.0.0.1:8891/docs)
 
 #### 3.4.4 启动 WebUI
+
+
 ```bash
+pip install streamlit==1.11.1
 # 配置模型服务地址
 export API_ENDPOINT=http://127.0.0.1:8891
 # 在指定端口 8502 启动 WebUI
 python -m streamlit run ui/webapp_semantic_search.py --server.port 8502
 ```
-Linux 用户推荐采用 Shell 脚本来启动服务：：
+Linux 用户推荐采用 Shell 脚本来启动服务：
 
 ```bash
 sh examples/semantic-search/run_search_web.sh

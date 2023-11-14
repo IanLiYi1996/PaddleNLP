@@ -31,7 +31,6 @@ GLM_PRETRAINED_INIT_CONFIGURATION = {
         "attention_dropout_prob": 0.1,
         "attention_scale": 1.0,
         "block_position_encoding": True,
-        "checkpoint_activations": False,
         "checkpoint_num_layers": 1,
         "embedding_dropout_prob": 0.1,
         "hidden_size": 1152,
@@ -43,7 +42,6 @@ GLM_PRETRAINED_INIT_CONFIGURATION = {
         "layernorm_epsilon": 1e-5,
         "output_dropout_prob": 0.1,
         "output_predict": True,
-        "paddle_dtype": "float32",
         "parallel_output": False,
         "pool_token": "cls",
         "relative_encoding": False,
@@ -56,7 +54,6 @@ GLM_PRETRAINED_INIT_CONFIGURATION = {
         "attention_dropout_prob": 0.1,
         "attention_scale": 1.0,
         "block_position_encoding": True,
-        "checkpoint_activations": False,
         "checkpoint_num_layers": 1,
         "embedding_dropout_prob": 0.1,
         "hidden_size": 2048,
@@ -67,7 +64,6 @@ GLM_PRETRAINED_INIT_CONFIGURATION = {
         "num_layers": 36,
         "output_dropout_prob": 0.1,
         "output_predict": True,
-        "paddle_dtype": "float32",
         "parallel_output": True,
         "pool_token": "cls",
         "relative_encoding": False,
@@ -79,7 +75,6 @@ GLM_PRETRAINED_INIT_CONFIGURATION = {
         "attention_dropout_prob": 0.1,
         "attention_scale": 1.0,
         "block_position_encoding": True,
-        "checkpoint_activations": False,
         "checkpoint_num_layers": 1,
         "embedding_dropout_prob": 0.1,
         "hidden_size": 4096,
@@ -90,7 +85,6 @@ GLM_PRETRAINED_INIT_CONFIGURATION = {
         "num_layers": 48,
         "output_dropout_prob": 0.1,
         "output_predict": True,
-        "paddle_dtype": "float32",
         "parallel_output": True,
         "pool_token": "cls",
         "relative_encoding": False,
@@ -102,7 +96,6 @@ GLM_PRETRAINED_INIT_CONFIGURATION = {
         "attention_dropout_prob": 0.1,
         "attention_scale": 1.0,
         "block_position_encoding": True,
-        "checkpoint_activations": False,
         "checkpoint_num_layers": 1,
         "embedding_dropout_prob": 0.1,
         "hidden_size": 1024,
@@ -114,7 +107,6 @@ GLM_PRETRAINED_INIT_CONFIGURATION = {
         "layernorm_epsilon": 1e-5,
         "output_dropout_prob": 0.1,
         "output_predict": True,
-        "paddle_dtype": "float32",
         "parallel_output": False,
         "pool_token": "cls",
         "relative_encoding": False,
@@ -126,7 +118,6 @@ GLM_PRETRAINED_INIT_CONFIGURATION = {
         "attention_dropout_prob": 0.1,
         "attention_scale": 1.0,
         "block_position_encoding": True,
-        "checkpoint_activations": False,
         "checkpoint_num_layers": 1,
         "embedding_dropout_prob": 0.1,
         "hidden_size": 4096,
@@ -137,7 +128,6 @@ GLM_PRETRAINED_INIT_CONFIGURATION = {
         "num_layers": 48,
         "output_dropout_prob": 0.1,
         "output_predict": True,
-        "paddle_dtype": "float32",
         "parallel_output": True,
         "pool_token": "cls",
         "relative_encoding": False,
@@ -211,7 +201,7 @@ class GLMConfig(PretrainedConfig):
     >>> configuration = model.config
     ```"""
     model_type = "glm"
-    attribute_map: Dict[str, str] = {"num_hidden_layers": "num_layers", "torch_dtype": "paddle_dtype"}
+    attribute_map: Dict[str, str] = {"num_hidden_layers": "num_layers", "torch_dtype": "dtype"}
     pretrained_init_configuration = GLM_PRETRAINED_INIT_CONFIGURATION
 
     def __init__(
@@ -224,7 +214,6 @@ class GLMConfig(PretrainedConfig):
         attention_dropout_prob=0.1,
         output_dropout_prob=0.1,
         max_sequence_length=512,
-        checkpoint_activations=False,
         checkpoint_num_layers=1,
         parallel_output=True,
         relative_encoding=False,
@@ -236,7 +225,6 @@ class GLMConfig(PretrainedConfig):
         initializer_range=0.02,
         pool_token="cls",
         layernorm_epsilon=1e-5,
-        paddle_dtype="float32",
         use_scaled_init_for_output_weights=False,
         **kwargs
     ):
@@ -249,7 +237,6 @@ class GLMConfig(PretrainedConfig):
         self.attention_dropout_prob = attention_dropout_prob
         self.output_dropout_prob = output_dropout_prob
         self.max_sequence_length = max_sequence_length
-        self.checkpoint_activations = checkpoint_activations
         self.checkpoint_num_layers = checkpoint_num_layers
         self.parallel_output = parallel_output
         self.relative_encoding = relative_encoding
@@ -261,6 +248,5 @@ class GLMConfig(PretrainedConfig):
         self.initializer_range = initializer_range
         self.pool_token = pool_token
         self.layernorm_epsilon = layernorm_epsilon
-        self.paddle_dtype = paddle_dtype
         self.use_scaled_init_for_output_weights = use_scaled_init_for_output_weights
         self._fast_entry = None

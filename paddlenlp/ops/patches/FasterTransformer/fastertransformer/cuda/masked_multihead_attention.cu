@@ -19,7 +19,7 @@
 #include "masked_multihead_attention_utils.h"
 #include <assert.h>
 #include <float.h>
-
+#include <stdexcept>
 //#define MMHA_USE_HMMA_FOR_REDUCTION
 
 // Below are knobs to extend FP32 accumulation for higher FP16 accuracy
@@ -64,7 +64,7 @@ namespace mmha {
 // the end of each iteration of the Q * K^T loop, we perform a reduction between lanes using an
 // HMMA instruction (Tensor Core). Each Q * K^T valuey is stored in shared memory in FP32.
 //
-// After that loop, a parallel softmax is computed accross the different Q * K^T values stored in
+// After that loop, a parallel softmax is computed across the different Q * K^T values stored in
 // shared memory.
 //
 // The kernel ends with a loop over the values in V. We use THREADS_PER_VALUE to control how many

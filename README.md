@@ -20,40 +20,89 @@
 
 
 <h4 align="center">
-  <a href=#特性> 特性 </a> |
   <a href=#安装> 安装 </a> |
   <a href=#快速开始> 快速开始 </a> |
-  <a href=#api文档> API文档 </a> |
+  <a href=#特性> 特性 </a> |
   <a href=#社区交流> 社区交流 </a>
 </h4>
 
-**PaddleNLP**是一款**简单易用**且**功能强大**的自然语言处理开发库。聚合业界**优质预训练模型**并提供**开箱即用**的开发体验，覆盖NLP多场景的模型库搭配**产业实践范例**可满足开发者**灵活定制**的需求。
+**PaddleNLP**是一款**简单易用**且**功能强大**的自然语言处理和大语言模型(LLM)开发库。聚合业界**优质预训练模型**并提供**开箱即用**的开发体验，覆盖NLP多场景的模型库搭配**产业实践范例**可满足开发者**灵活定制**的需求。
 
 ## News 📢
 
-* **2023.1.12 发布 [PaddleNLP v2.5](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.5.0)**
-  * 🔨 NLP工具：发布 [PPDiffusers](./ppdiffusers) 国产化的扩散模型工具箱，集成多种 Diffusion 模型参数和模型组件，提供了 Diffusion 模型的完整训练流程，支持 Diffusion 模型的高性能  FastDeploy 推理加速 和 多硬件部署(可支持昇腾芯片、昆仑芯部署)
-  * 💎 产业应用：信息抽取、文本分类、情感分析、智能问答 四大应用全新升级，发布文档信息抽取 [UIE-X](./applications/information_extraction/document) 、统一文本分类 [UTC](./applications/zero_shot_text_classification) 、统一情感分析 [UIE-Senta](./applications/sentiment_analysis/unified_sentiment_extraction) 、[无监督问答应用](./applications/question_answering/unsupervised_qa)；同时发布[ERNIE 3.0 Tiny v2](./model_zoo/ernie-tiny) 系列预训练小模型，在低资源和域外数据效果更强，开源 模型裁剪、模型量化、FastDeploy 推理加速、边缘端部署 端到端部署方案，降低预训练模型部署难度
-  * 💪 框架升级：预训练模型[参数配置统一](./paddlenlp/transformers/configuration_utils.py)，自定义参数配置的保存和加载无需额外开发；[Trainer API](./docs/trainer.md) 新增 BF16 训练、Recompute 重计算、Sharding 等多项分布式能力，通过简单配置即可进行超大规模预训练模型训练；[模型压缩 API](./docs/compression.md) 支持量化训练、词表压缩等功能，压缩后的模型精度损失更小，模型部署的内存占用大大降低；[数据增强API](./docs/dataaug.md) 全面升级，支持字、词、句子三种粒度数据增强策略，可轻松定制数据增强策略
-  * 🤝 生态联合：🤗Huggingface hub 正式兼容 PaddleNLP 预训练模型，支持 PaddleNLP Model 和 Tokenizer 直接从 🤗Huggingface hub 下载和上传，欢迎大家在 🤗Huggingface hub [体验](https://huggingface.co/PaddlePaddle) PaddleNLP 预训练模型效果
-
-* **2022.9.6 发布 [PaddleNLP v2.4](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.0)**
-  * 🔨 NLP工具：[NLP 流水线系统 Pipelines](./pipelines) 发布，支持快速搭建搜索引擎、问答系统，可扩展支持各类NLP系统，让解决 NLP 任务像搭积木一样便捷、灵活、高效！
-  * 💎 产业应用：新增 [文本分类全流程应用方案](./applications/text_classification) ，覆盖多分类、多标签、层次分类各类场景，支持小样本学习和 TrustAI 可信计算模型训练与调优。
-  * 🍭 AIGC ：新增代码生成 SOTA 模型[CodeGen](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/code_generation/codegen)，支持多种编程语言代码生成；
-  * 💪 框架升级：[模型自动压缩 API](./docs/compression.md) 发布，自动对模型进行裁减和量化，大幅降低模型压缩技术使用门槛；[小样本 Prompt](./applications/text_classification/multi_class/few-shot)能力发布，集成 PET、P-Tuning、RGL 等经典算法。
+* **2023.8.15 [PaddleNLP v2.6](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.6.0)**： 发布[全流程大模型工具链](./llm)，涵盖预训练，精调，压缩，推理以及部署等各个环节，为用户提供端到端的大模型方案和一站式的开发体验；内置[4D并行分布式Trainer](./docs/trainer.md)，[高效微调算法LoRA/Prefix Tuning](./llm#33-lora), [自研INT8/INT4量化算法](./llm#6-量化)等等；全面支持[LLaMA 1/2](./llm/llama), [BLOOM](.llm/bloom), [ChatGLM 1/2](./llm/chatglm), [GLM](./llm/glm), [OPT](./llm/opt)等主流大模型
 
 
-## 社区交流
+## 安装
 
-- 微信扫描二维码并填写问卷，回复小助手关键词（NLP）之后，即可加入交流群领取福利
+### 环境依赖
 
-  - 与众多社区开发者以及官方团队深度交流。
-  - 10G重磅NLP学习大礼包！
+- python >= 3.7
+- paddlepaddle >= 2.5.1
+- 如需大模型功能，请使用 paddlepaddle-gpu >= 2.5.1
 
-  <div align="center">
-  <img src="https://user-images.githubusercontent.com/11793384/212060369-4642d16e-f0ad-4359-aa57-b8303042f9c1.jpg" width="150" height="150" />
-  </div>
+### pip安装
+
+```shell
+pip install --upgrade paddlenlp
+```
+
+或者可通过以下命令安装最新 develop 分支代码：
+
+```shell
+pip install --pre --upgrade paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
+```
+
+更多关于PaddlePaddle和PaddleNLP安装的详细教程请查看[Installation](./docs/get_started/installation.rst)。
+
+## 快速开始
+
+
+### 大模型文本生成
+
+PaddleNLP提供了方便易用的Auto API，能够快速的加载模型和Tokenizer。这里以使用 `linly-ai/chinese-llama-2-7b` 大模型做文本生成为例：
+
+```python
+>>> from paddlenlp.transformers import AutoTokenizer, AutoModelForCausalLM
+>>> tokenizer = AutoTokenizer.from_pretrained("linly-ai/chinese-llama-2-7b")
+>>> model = AutoModelForCausalLM.from_pretrained("linly-ai/chinese-llama-2-7b", dtype="float16")
+>>> input_features = tokenizer("你好！请自我介绍一下。", return_tensors="pd")
+>>> outputs = model.generate(**input_features, max_length=128)
+>>> tokenizer.batch_decode(outputs[0])
+['\n你好！我是一个AI语言模型，可以回答你的问题和提供帮助。']
+```
+
+### 一键UIE预测
+
+PaddleNLP提供[一键预测功能](./docs/model_zoo/taskflow.md)，无需训练，直接输入数据即可开放域抽取结果。这里以信息抽取-命名实体识别任务，UIE模型为例：
+
+```python
+>>> from pprint import pprint
+>>> from paddlenlp import Taskflow
+
+>>> schema = ['时间', '选手', '赛事名称'] # Define the schema for entity extraction
+>>> ie = Taskflow('information_extraction', schema=schema)
+>>> pprint(ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！"))
+[{'时间': [{'end': 6,
+          'probability': 0.9857378532924486,
+          'start': 0,
+          'text': '2月8日上午'}],
+  '赛事名称': [{'end': 23,
+            'probability': 0.8503089953268272,
+            'start': 6,
+            'text': '北京冬奥会自由式滑雪女子大跳台决赛'}],
+  '选手': [{'end': 31,
+          'probability': 0.8981548639781138,
+          'start': 28,
+          'text': '谷爱凌'}]}]
+```
+
+更多PaddleNLP内容可参考：
+- [大模型全流程工具链](./llm)，包含主流中文大模型的全流程方案。
+- [精选模型库](./model_zoo)，包含优质预训练模型的端到端全流程使用。
+- [多场景示例](./examples)，了解如何使用PaddleNLP解决NLP多种技术问题，包含基础技术、系统应用与拓展应用。
+- [交互式教程](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)，在🆓免费算力平台AI Studio上快速学习PaddleNLP。
+
 
 ## 特性
 
@@ -216,7 +265,7 @@ PaddleNLP针对信息抽取、语义检索、智能问答、情感分析等高�
 
 #### 🎙️ 智能语音指令解析
 
-集成了[PaddleSpeech](https://github.com/PaddlePaddle/PaddleSpeech)和[百度开放平台](https://ai.baidu.com/)的的语音识别和[UIE](./model_zoo/uie)通用信息抽取等技术，打造智能一体化的语音指令解析系统范例，该方案可应用于智能语音填单、智能语音交互、智能语音检索等场景，提高人机交互效率。
+集成了[PaddleSpeech](https://github.com/PaddlePaddle/PaddleSpeech)和[百度开放平台](https://ai.baidu.com/)的语音识别和[UIE](./model_zoo/uie)通用信息抽取等技术，打造智能一体化的语音指令解析系统范例，该方案可应用于智能语音填单、智能语音交互、智能语音检索等场景，提高人机交互效率。
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/16698950/168589100-a6c6f346-97bb-47b2-ac26-8d50e71fddc5.png" width="400">
@@ -263,76 +312,16 @@ outputs, _ = model.generate(
 
 更多关于千亿级AI模型的分布式训练使用说明可参考[GPT-3](./examples/language_model/gpt-3)。
 
-## 安装
+## 社区交流
 
-### 环境依赖
+- 微信扫描二维码并填写问卷，回复小助手关键词（NLP）之后，即可加入交流群领取福利
 
-- python >= 3.7
-- paddlepaddle >= 2.3
+  - 与众多社区开发者以及官方团队深度交流。
+  - 10G重磅NLP学习大礼包！
 
-### pip安装
-
-```shell
-pip install --upgrade paddlenlp
-```
-
-或者可通过以下命令安装最新 develop 分支代码：
-
-```shell
-pip install --pre --upgrade paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
-```
-
-更多关于PaddlePaddle和PaddleNLP安装的详细教程请查看[Installation](./docs/get_started/installation.rst)。
-
-## 快速开始
-
-这里以信息抽取-命名实体识别任务，UIE模型为例，来说明如何快速使用PaddleNLP:
-
-### 一键预测
-
-PaddleNLP提供[一键预测功能](./docs/model_zoo/taskflow.md)，无需训练，直接输入数据即可开放域抽取结果：
-
-```python
->>> from pprint import pprint
->>> from paddlenlp import Taskflow
-
->>> schema = ['时间', '选手', '赛事名称'] # Define the schema for entity extraction
->>> ie = Taskflow('information_extraction', schema=schema)
->>> pprint(ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！"))
-[{'时间': [{'end': 6,
-          'probability': 0.9857378532924486,
-          'start': 0,
-          'text': '2月8日上午'}],
-  '赛事名称': [{'end': 23,
-            'probability': 0.8503089953268272,
-            'start': 6,
-            'text': '北京冬奥会自由式滑雪女子大跳台决赛'}],
-  '选手': [{'end': 31,
-          'probability': 0.8981548639781138,
-          'start': 28,
-          'text': '谷爱凌'}]}]
-```
-
-### 小样本学习
-
-如果对一键预测效果不满意，也可以使用少量数据进行模型精调，进一步提升特定场景的效果，详见[UIE小样本定制训练](./model_zoo/uie/)。
-
-更多PaddleNLP内容可参考：
-- [精选模型库](./model_zoo)，包含优质预训练模型的端到端全流程使用。
-- [多场景示例](./examples)，了解如何使用PaddleNLP解决NLP多种技术问题，包含基础技术、系统应用与拓展应用。
-- [交互式教程](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)，在🆓免费算力平台AI Studio上快速学习PaddleNLP。
-
-
-## API文档
-
-PaddleNLP提供全流程的文本领域API，可大幅提升NLP任务建模的效率：
-
-- 支持[千言](https://www.luge.ai)等丰富中文数据集加载的[Dataset API](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html)。
-- 提供🤗Hugging Face Style的API，支持 **500+** 优质预训练模型加载的[Transformers API](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html)。
-- 提供30+多语言词向量的[Embedding API](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/embeddings.html)
-
-更多使用方法请参考[API文档](https://paddlenlp.readthedocs.io/zh/latest/)。
-
+  <div align="center">
+  <img src="https://user-images.githubusercontent.com/11987277/245085922-0aa68d24-00ff-442e-9c53-2f1e898151ce.png" width="150" height="150" />
+  </div>
 
 ## Citation
 

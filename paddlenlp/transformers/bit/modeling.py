@@ -664,7 +664,7 @@ class BitModel(BitPretrainedModel):
     Refer to the superclass documentation for the generic methods.
 
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
@@ -686,8 +686,6 @@ class BitModel(BitPretrainedModel):
         )
 
         self.pooler = nn.AdaptiveAvgPool2D((1, 1))
-
-        self.apply(self._init_weights)
 
     def forward(
         self, pixel_values: Tensor, output_hidden_states: Optional[bool] = None, return_dict: Optional[bool] = None
@@ -742,7 +740,7 @@ class BitForImageClassification(BitPretrainedModel):
     Refer to the superclass documentation for the generic methods.
 
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
@@ -759,8 +757,6 @@ class BitForImageClassification(BitPretrainedModel):
             nn.Flatten(),
             nn.Linear(config.hidden_sizes[-1], config.num_labels) if config.num_labels > 0 else nn.Identity(),
         )
-
-        self.apply(self._init_weights)
 
     def forward(
         self,
@@ -829,7 +825,7 @@ class BitBackbone(BitPretrainedModel, BackboneMixin):
     BiT backbone, to be used with frameworks like DETR and MaskFormer.
 
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
@@ -851,8 +847,6 @@ class BitBackbone(BitPretrainedModel, BackboneMixin):
             out_feature_channels[stage] = config.hidden_sizes[idx]
 
         self.out_feature_channels = out_feature_channels
-
-        self.apply(self._init_weights)
 
     @property
     def channels(self):

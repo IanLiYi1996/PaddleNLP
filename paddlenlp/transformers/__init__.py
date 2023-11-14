@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,6 +29,16 @@ from .processing_utils import ProcessorMixin
 from .feature_extraction_utils import BatchFeature, FeatureExtractionMixin
 from .image_processing_utils import ImageProcessingMixin
 from .attention_utils import create_bigbird_rand_mask_idx_list
+from .sequence_parallel_utils import (
+    GatherOp,
+    ScatterOp,
+    AllGatherOp,
+    ReduceScatterOp,
+    ColumnSequenceParallelLinear,
+    RowSequenceParallelLinear,
+    mark_as_sequence_parallel_parameter,
+    register_sequence_parallel_allreduce_hooks,
+)
 from .export import export_model
 
 # isort: split
@@ -37,9 +47,7 @@ from .bert.tokenizer import *
 from .bert.configuration import *
 
 # isort: split
-from .gpt.modeling import *
-from .gpt.tokenizer import *
-from .gpt.configuration import *
+from .gpt import *
 from .roberta.modeling import *
 from .roberta.tokenizer import *
 from .roberta.configuration import *
@@ -73,6 +81,7 @@ from .blip.image_processing import *
 from .chinesebert.configuration import *
 from .chinesebert.modeling import *
 from .chinesebert.tokenizer import *
+from .convbert.configuration import *
 from .convbert.modeling import *
 from .convbert.tokenizer import *
 from .ctrl.modeling import *
@@ -105,8 +114,12 @@ from .ernie_m.modeling import *
 from .ernie_m.tokenizer import *
 from .fnet.modeling import *
 from .fnet.tokenizer import *
+from .fnet.configuration import *
 from .funnel.modeling import *
 from .funnel.tokenizer import *
+from .funnel.configuration import *
+from .llama import *
+from .layoutlm.configuration import *
 from .layoutlm.modeling import *
 from .layoutlm.tokenizer import *
 from .layoutlmv2.modeling import *
@@ -114,8 +127,10 @@ from .layoutlmv2.tokenizer import *
 from .layoutlmv2.configuration import *
 from .layoutxlm.modeling import *
 from .layoutxlm.tokenizer import *
+from .layoutxlm.configuration import *
 from .luke.modeling import *
 from .luke.tokenizer import *
+from .luke.configuration import *
 from .mbart.modeling import *
 from .mbart.tokenizer import *
 from .mbart.configuration import *
@@ -124,9 +139,11 @@ from .megatronbert.tokenizer import *
 from .megatronbert.configuration import *
 from .prophetnet.modeling import *
 from .prophetnet.tokenizer import *
+from .prophetnet.configuration import *
 from .mobilebert.configuration import *
 from .mobilebert.modeling import *
 from .mobilebert.tokenizer import *
+from .mpnet.configuration import *
 from .mpnet.modeling import *
 from .mpnet.tokenizer import *
 from .mt5.configuration import *
@@ -141,6 +158,7 @@ from .reformer.tokenizer import *
 from .reformer.configuration import *
 from .rembert.modeling import *
 from .rembert.tokenizer import *
+from .rembert.configuration import *
 from .roformer.modeling import *
 from .roformer.configuration import *
 from .roformer.tokenizer import *
@@ -150,6 +168,7 @@ from .skep.modeling import *
 from .skep.tokenizer import *
 from .squeezebert.modeling import *
 from .squeezebert.tokenizer import *
+from .squeezebert.configuration import *
 from .t5.modeling import *
 from .t5.tokenizer import *
 from .t5.configuration import *
@@ -160,6 +179,9 @@ from .transformer.modeling import *
 from .unified_transformer.modeling import *
 from .unified_transformer.tokenizer import *
 from .unified_transformer.configuration import *
+from .ernie_code.tokenizer import *
+from .ernie_code.modeling import *
+from .ernie_code.configuration import *
 from .ernie_vil.configuration import *
 from .ernie_vil.modeling import *
 from .ernie_vil.feature_extraction import *
@@ -231,6 +253,33 @@ from .clipseg.image_processing import *
 from .blip_2.modeling import *
 from .blip_2.configuration import *
 from .blip_2.processing import *
+from .chatglm.configuration import *
+from .chatglm.modeling import *
+from .chatglm.tokenizer import *
+from .chatglm_v2.configuration import *
+from .chatglm_v2.modeling import *
+from .chatglm_v2.tokenizer import *
+from .speecht5.configuration import *
+from .speecht5.modeling import *
+from .speecht5.tokenizer import *
+from .speecht5.processing import *
+from .speecht5.feature_extraction import *
+from .minigpt4.modeling import *
+from .minigpt4.configuration import *
+from .minigpt4.processing import *
+from .minigpt4.image_processing import *
+from .clap.configuration import *
+from .clap.feature_extraction import *
+from .clap.modeling import *
+from .clap.processing import *
+from .visualglm.modeling import *
+from .visualglm.configuration import *
+from .visualglm.processing import *
+from .visualglm.image_processing import *
+from .rw.modeling import *
+from .rw.configuration import *
+from .rw.tokenizer import *
+from .qwen import *
 
 # For faster tokenizer
 from ..utils.import_utils import is_fast_tokenizer_available

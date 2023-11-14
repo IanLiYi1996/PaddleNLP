@@ -188,7 +188,7 @@ class CLIPSegVisionEmbeddings(nn.Layer):
         self.num_patches = (self.image_size // self.patch_size) ** 2
         self.num_positions = self.num_patches + 1
         self.position_embedding = nn.Embedding(self.num_positions, self.embed_dim)
-        self.register_buffer("position_ids", paddle.arange(self.num_positions).expand((1, -1)))
+        self.register_buffer("position_ids", paddle.arange(self.num_positions).expand((1, -1)), persistable=False)
 
     def interpolate_position_embeddings(self, new_size):
         if len(new_size) != 2:
@@ -237,7 +237,11 @@ class CLIPSegTextEmbeddings(nn.Layer):
         self.position_embedding = nn.Embedding(config.max_position_embeddings, embed_dim)
 
         # position_ids (1, len position emb) is contiguous in memory and exported when serialized
-        self.register_buffer("position_ids", paddle.arange(config.max_position_embeddings).expand((1, -1)))
+        self.register_buffer(
+            "position_ids",
+            paddle.arange(config.max_position_embeddings, dtype="int64").expand((1, -1)),
+            persistable=False,
+        )
 
     def forward(
         self,
@@ -442,13 +446,6 @@ class CLIPSegPreTrainedModel(PretrainedModel):
     supports_gradient_checkpointing = True
     _keys_to_ignore_on_load_missing = [r"position_ids"]
 
-    def init_weights(self):
-        """
-        A method executed at the end of each Transformer model initialization, to execute code that needs the model's
-        modules properly initialized (such as weight initialization).
-        """
-        self.apply(self._init_weights)
-
     def _init_weights(self, module):
         """Initialize the weights"""
         factor = self.config.initializer_factor
@@ -606,6 +603,9 @@ class CLIPSegTextTransformer(nn.Layer):
         self.encoder = CLIPSegEncoder(config)
         self.final_layer_norm = nn.LayerNorm(embed_dim, epsilon=config.layer_norm_eps)
 
+        # For `pooled_output` computation
+        self.eos_token_id = config.eos_token_id
+
     # Copied from paddlenlp.transformers.clip.modeling.CLIPTextTransformer.forward with clip->clipseg, CLIP->CLIPSeg
     def forward(
         self,
@@ -654,13 +654,31 @@ class CLIPSegTextTransformer(nn.Layer):
         last_hidden_state = encoder_outputs[0]
         last_hidden_state = self.final_layer_norm(last_hidden_state)
 
-        # text_embeds.shape = [batch_size, sequence_length, transformer.width]
-        # take features from the eot embedding (eot_token is the highest number in each sequence)
-        # casting to torch.int for onnx compatibility: argmax doesn't support int64 inputs with opset 14
-        pooled_output = last_hidden_state[
-            paddle.arange(last_hidden_state.shape[0]),
-            input_ids.argmax(axis=-1),
-        ]
+        if self.eos_token_id == 2:
+            # The `eos_token_id` was incorrect before PR #24773: Let's keep what have been done here.
+            # A CLIPSeg model with such `eos_token_id` in the config can't work correctly with extra new tokens added
+            # ------------------------------------------------------------
+            # text_embeds.shape = [batch_size, sequence_length, transformer.width]
+            # take features from the eot embedding (eot_token is the highest number in each sequence)
+            # casting to paddle.int32 for onnx compatibility: argmax doesn't support int64 inputs with opset 14
+            pooled_output = last_hidden_state.gather_nd(
+                paddle.stack(
+                    [paddle.arange(last_hidden_state.shape[0], dtype="int32"), input_ids.argmax(-1, dtype="int32")],
+                    axis=-1,
+                )
+            )
+        else:
+            # The config gets updated `eos_token_id` from PR #24773 (so the use of exta new tokens is possible)
+            # We need to get the first position of `eos_token_id` value (`pad_token_ids` might equal to `eos_token_id`)
+            pooled_output = last_hidden_state.gather_nd(
+                paddle.stack(
+                    [
+                        paddle.arange(last_hidden_state.shape[0], dtype="int32"),
+                        (input_ids == self.eos_token_id).cast("int32").argmax(axis=-1, dtype="int32"),
+                    ],
+                    axis=-1,
+                )
+            )
 
         if not return_dict:
             return (last_hidden_state, pooled_output) + encoder_outputs[1:]
@@ -689,8 +707,6 @@ class CLIPSegTextModel(CLIPSegPreTrainedModel):
     def __init__(self, config: CLIPSegTextConfig):
         super().__init__(config)
         self.text_model = CLIPSegTextTransformer(config)
-        # Initialize weights and apply final processing
-        self.init_weights()
 
     def get_input_embeddings(self) -> nn.Layer:
         return self.text_model.embeddings.token_embedding
@@ -793,8 +809,6 @@ class CLIPSegVisionModel(CLIPSegPreTrainedModel):
     def __init__(self, config: CLIPSegVisionConfig):
         super().__init__(config)
         self.vision_model = CLIPSegVisionTransformer(config)
-        # Initialize weights and apply final processing
-        self.init_weights()
 
     def get_input_embeddings(self) -> nn.Layer:
         return self.vision_model.embeddings.patch_embedding
@@ -865,9 +879,6 @@ class CLIPSegModel(CLIPSegPreTrainedModel):
             dtype=paddle.get_default_dtype(),
             default_initializer=nn.initializer.Constant(self.config.logit_scale_init_value),
         )
-
-        # Initialize weights and apply final processing
-        self.init_weights()
 
     def get_text_features(
         self,
@@ -1210,9 +1221,6 @@ class CLIPSegForImageSegmentation(CLIPSegPreTrainedModel):
         self.extract_layers = config.extract_layers
 
         self.decoder = CLIPSegDecoder(config)
-
-        # Initialize weights and apply final processing
-        self.init_weights()
 
     def get_conditional_embeddings(
         self,

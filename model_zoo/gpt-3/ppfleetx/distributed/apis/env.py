@@ -31,32 +31,66 @@ _hcg = None
 
 
 def set_seed(seed):
+    # NOTE(shenliang03): For parameter init seed:
+    # seed: dp/mp_undistributed_paramter/sharding is same; others is different
+    # For compute seed(dropout):
+    # global seed: only mp group is same.
+    # local seed: all groups are different
+
     if dist.get_world_size() > 1:
         # obtain rank message of hybrid parallel
         hcg = get_hcg()
+
         mp_rank = hcg.get_model_parallel_rank()
+        mp_size = hcg.get_model_parallel_world_size()
+
         pp_rank = hcg.get_stage_id()
-        data_world_rank = get_data_world_rank()
-        data_world_size = get_data_world_size()
+        pp_size = hcg.get_pipe_parallel_world_size()
+
+        dp_rank = hcg.get_data_parallel_rank()
+        dp_size = hcg.get_data_parallel_world_size()
+
+        sharding_rank = hcg.get_sharding_parallel_rank()
+        # sharding_size = hcg.get_sharding_parallel_world_size()
     else:
-        mp_rank, pp_rank, data_world_rank, data_world_size = 0, 0, 0, 1
+        mp_rank, mp_size = 0, 1
+        pp_rank, pp_size = 0, 1
+        dp_rank, dp_size = 0, 1
+        sharding_rank, _ = 0, 1
 
     # NOTE: the commented seeds are set only for precision validation
     # seed += 100 * pp_rank
-    # random.seed(seed)
-    # np.random.seed(seed)
-    # paddle.seed(seed)
+    random.seed(seed + 100 * pp_rank)
+    np.random.seed(seed + 100 * pp_rank)
 
-    random.seed(seed + data_world_rank)
-    np.random.seed(seed + data_world_rank)
-    paddle.seed(seed + data_world_rank)
+    # seed = mp_rank +
+    #        pp_rank * (mp_size) +
+    #        dp_rank * (mp_size * pp_size) +
+    #        sharding_rank * (mp_size * pp_size * dp_size)
+    # seed offset is order to avoid conflicts with the parameter initialization seed
 
-    # local_seed/ global_seed is used to control dropout in ModelParallel
-    local_seed = seed + 123 + mp_rank * 10 + pp_rank * 1000 + data_world_size
-    global_seed = seed + data_world_rank
+    seed_offset = seed + 1024 + paddle.distributed.get_world_size()
+    global_seed = (
+        seed_offset
+        + pp_rank * (mp_size)
+        + dp_rank * (mp_size * pp_size)
+        + sharding_rank * (mp_size * pp_size * dp_size)
+    )
+
+    seed_offset += paddle.distributed.get_world_size()
+    local_seed = (
+        seed_offset
+        + mp_rank
+        + pp_rank * (mp_size)
+        + dp_rank * (mp_size * pp_size)
+        + sharding_rank * (mp_size * pp_size * dp_size)
+    )
+
     tracker = get_rng_state_tracker()
     tracker.add("global_seed", global_seed)
     tracker.add("local_seed", local_seed)
+
+    paddle.seed(global_seed)
 
     logger.info("The global seed is set to {} and local seed is set to {}.".format(global_seed, local_seed))
 
@@ -88,12 +122,22 @@ def get_dp_seed():
 
 def init_dist_env(config):
     paddle.set_device(config.Global.device)
-
     strategy = fleet.DistributedStrategy()
+    def is_segment_parallel_supported():
+        import inspect
+        members = [name for (name, date) in inspect.getmembers(fleet.HybridCommunicateGroup)]
+        return "get_sep_parallel_world_size" in members
+
     if config.Distributed.mp_degree == 1 and config.Distributed.sharding.sharding_degree == 1:
-        order = ["pp", "dp", "sharding", "mp"]
+        if is_segment_parallel_supported():
+            order = ["pp", "dp", "sharding", "sep", "mp"]
+        else:
+            order = ["pp", "dp", "sharding", "mp"]
     else:
-        order = ["dp", "pp", "sharding", "mp"]
+        if is_segment_parallel_supported():
+            order = ["dp", "pp", "sharding", "sep", "mp"]
+        else:
+            order = ["dp", "pp", "sharding", "mp"]
 
     strategy.hybrid_configs = {
         "dp_degree": config.Distributed.dp_degree,
@@ -155,7 +199,7 @@ def get_data_world_rank():
 def work_at_local_rank0(func):
     def wrapper(*args, **kwargs):
         local_rank = 0
-        if paddle.fluid.core.is_compiled_with_dist() and paddle.distributed.get_world_size() > 1:
+        if paddle.base.core.is_compiled_with_dist() and paddle.distributed.get_world_size() > 1:
             local_rank = paddle.distributed.ParallelEnv().dev_id
         if local_rank == 0:
             func(*args, **kwargs)

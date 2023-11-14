@@ -1,4 +1,4 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2020 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,7 +27,6 @@ from typing import Optional, Tuple, Type
 
 import numpy as np
 import paddle
-import paddle.fluid as fluid
 from paddle.distributed.utils.launch_utils import (
     TrainerProc,
     find_free_ports,
@@ -35,11 +34,21 @@ from paddle.distributed.utils.launch_utils import (
     watch_local_trainers,
 )
 
+from paddlenlp.taskflow.utils import static_mode_guard
+from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 from paddlenlp.transformers.model_utils import PretrainedModel
 from paddlenlp.utils.env import CONFIG_NAME, LEGACY_CONFIG_NAME, MODEL_HOME
 
 from ..testing_utils import slow
+
+
+def _config_zero_init(config):
+    configs_no_init = copy.deepcopy(config)
+    for key in configs_no_init.__dict__.keys():
+        if "_range" in key or "_std" in key or "initializer_factor" in key or "layer_scale" in key:
+            setattr(configs_no_init, key, 1e-10)
+    return configs_no_init
 
 
 def get_cluster_from_args(selected_gpus):
@@ -195,7 +204,7 @@ def check_two_model_parameter(first_model: PretrainedModel, second_model: Pretra
     # random choice the keys to compare
     key = random.choice(list(first_model.state_dict().keys()))
     diff = first_model.state_dict()[key] - second_model.state_dict()[key]
-    assert diff.sum().numpy().item() == 0
+    assert diff.sum().item() == 0
 
 
 class ModelTesterMixin:
@@ -208,6 +217,7 @@ class ModelTesterMixin:
     test_mismatched_shapes = True
     test_missing_keys = True
     test_model_compatibility_keys = True
+    test_tie_weights = False
     use_test_inputs_embeds = False
     use_test_model_name_list = True
     is_encoder_decoder = False
@@ -311,6 +321,8 @@ class ModelTesterMixin:
         pass
 
     def test_attention_outputs(self):
+        if not self.has_attentions:
+            return
         config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
         seq_len = getattr(self.model_tester, "seq_length", None)
         decoder_seq_length = getattr(self.model_tester, "decoder_seq_length", seq_len)
@@ -565,15 +577,14 @@ class ModelTesterMixin:
             if self.model_tester.is_training is False:
                 model.eval()
 
-            model_vocab_size = config["vocab_size"]
+            model_vocab_size = config.vocab_size
             # Retrieve the embeddings and clone theme
-
             model_embed = model.resize_token_embeddings(model_vocab_size)
             cloned_embeddings = model_embed.weight.clone()
 
             # Check that resizing the token embeddings with a larger vocab size increases the model's vocab size
             model_embed = model.resize_token_embeddings(model_vocab_size + 10)
-            self.assertEqual(model.base_model.config["vocab_size"], model_vocab_size + 10)
+            self.assertEqual(model.base_model.config.vocab_size, model_vocab_size + 10)
             # Check that it actually resizes the embeddings matrix
             self.assertEqual(model_embed.weight.shape[0], cloned_embeddings.shape[0] + 10)
             # Check that the model can still do a forward pass successfully (every parameter should be resized)
@@ -581,7 +592,7 @@ class ModelTesterMixin:
 
             # Check that resizing the token embeddings with a smaller vocab size decreases the model's vocab size
             model_embed = model.resize_token_embeddings(model_vocab_size - 15)
-            self.assertEqual(model.base_model.config["vocab_size"], model_vocab_size - 15)
+            self.assertEqual(model.base_model.config.vocab_size, model_vocab_size - 15)
             # Check that it actually resizes the embeddings matrix
             self.assertEqual(model_embed.weight.shape[0], cloned_embeddings.shape[0] - 15)
 
@@ -666,7 +677,6 @@ class ModelTesterMixin:
         self.assertTrue(len(model.model_name_list) != 0)
 
     def test_pretrained_config_save_load(self):
-
         if self.base_model_class is None or not self.base_model_class.constructed_from_pretrained_config():
             return
 
@@ -688,7 +698,6 @@ class ModelTesterMixin:
                 self.assertEqual(getattr(config, key), getattr(loaded_config, key))
 
     def random_choice_pretrained_config_field(self) -> Optional[str]:
-
         if self.base_model_class is None or not self.base_model_class.constructed_from_pretrained_config():
             return None
 
@@ -711,14 +720,61 @@ class ModelTesterMixin:
             all_maps: dict = copy.deepcopy(model_class.config_class.attribute_map)
 
             for old_attribute, new_attribute in all_maps.items():
-                old_value = getattr(model, old_attribute)
-                new_value = getattr(model, new_attribute)
+                old_value = getattr(model.config, old_attribute)
+                new_value = getattr(model.config, new_attribute)
 
                 # eg: dropout can be an instance of nn.Dropout, so we should check it attribute
                 if type(new_value) != type(old_value):
                     continue
 
                 self.assertEqual(old_value, new_value)
+
+    def test_tie_weight(self):
+        # test whether id of input_embeding equal id of output_embeding ?
+        if not self.test_tie_weights:
+            return
+
+        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
+        for model_class in self.all_model_classes:
+            if "CausalLM" not in model_class.__name__ and "MaskedLM" not in model_class.__name__:
+                continue
+
+            model = self._make_model_instance(config, model_class)
+
+            if not model.config.tie_word_embeddings:
+                continue
+
+            if hasattr(model, "get_input_embeddings") and hasattr(model, "get_output_embeddings"):
+                try:
+                    input_embeddings = model.get_input_embeddings()
+                except NotImplementedError:
+                    continue
+
+                try:
+                    output_embeddings = model.get_output_embeddings()
+                except NotImplementedError:
+                    continue
+
+                if input_embeddings is not None and output_embeddings is not None:
+                    if hasattr(output_embeddings, "weight"):
+                        output_embeddings_weight = output_embeddings.weight
+                    else:
+                        output_embeddings_weight = output_embeddings
+
+                    if hasattr(input_embeddings, "weight"):
+                        input_embeddings_weight = input_embeddings.weight
+                    else:
+                        input_embeddings_weight = input_embeddings
+                    print(
+                        input_embeddings_weight,
+                        output_embeddings_weight,
+                    )
+                    print(
+                        "model name :{},id is{},{}".format(
+                            model_class, id(output_embeddings_weight), id(input_embeddings_weight)
+                        )
+                    )
+                    self.assertEqual(id(output_embeddings_weight), id(input_embeddings_weight))
 
 
 class ModelTesterPretrainedMixin:
@@ -738,6 +794,13 @@ class ModelTesterPretrainedMixin:
         if self.paddlehub_remote_test_model_path is None or self.base_model_class is None:
             return
         model = self.base_model_class.from_pretrained(self.paddlehub_remote_test_model_path)
+        self.assertIsNotNone(model)
+
+    def test_model_from_config_paddle_hub(self):
+        if self.paddlehub_remote_test_model_path is None or self.base_model_class is None:
+            return
+        config = self.base_model_class.config_class.from_pretrained(self.paddlehub_remote_test_model_path)
+        model = self.base_model_class.from_config(config)
         self.assertIsNotNone(model)
 
     @slow
@@ -819,7 +882,7 @@ class DistributedTest(unittest.TestCase):
         eager_mode=True,
         allocator_strategy="auto_growth",
     ):
-        if not fluid.core.is_compiled_with_cuda() or fluid.core.get_cuda_device_count() == 0:
+        if not paddle.framework.core.is_compiled_with_cuda() or paddle.framework.core.get_cuda_device_count() == 0:
             return
 
         cluster = None
@@ -843,3 +906,160 @@ class DistributedTest(unittest.TestCase):
                 print("Local procs complete, POD info:{}".format(pod))
                 break
             time.sleep(3)
+
+
+class GenerationD2STestMixin:
+    article = """Justin Timberlake and Jessica Biel, welcome to parenthood."""
+    internal_testing_model = None
+
+    TokenizerClass = AutoTokenizer
+    CausalLMClass = AutoModelForCausalLM
+    max_new_tokens = 20
+
+    def setUp(self):
+        paddle.disable_static()
+        super().setUp()
+
+    def tearDown(self):
+        paddle.disable_static()
+        super().setUp()
+
+    def test_to_static_use_top_k(self):
+        tokenizer = self.TokenizerClass.from_pretrained(self.internal_testing_model)
+        if tokenizer.__class__.__name__ == "LlamaTokenizer":
+            tokenizer.pad_token = tokenizer.eos_token if tokenizer.eos_token else "<pad>"
+
+        model = self.CausalLMClass.from_pretrained(self.internal_testing_model)
+        model_kwargs = tokenizer(
+            self.article,
+            max_length=self.max_new_tokens,
+            truncation=True,
+            truncation_side="left",
+            return_tensors="pd",
+            padding=True,
+            add_special_tokens=True,
+        )
+        model.is_encoder_decoder = False
+
+        model.eval()
+
+        model_kwargs["use_cache"] = True
+        model_kwargs["max_length"] = self.max_new_tokens + model_kwargs["input_ids"].shape[-1]
+
+        decoded_ids = model.greedy_search(
+            logits_processors=None,
+            bos_token_id=model.config.bos_token_id,
+            pad_token_id=model.config.pad_token_id,
+            eos_token_id=model.config.eos_token_id,
+            **model_kwargs,
+        )[0]
+
+        dygraph_decoded_ids = decoded_ids.tolist()
+
+        with static_mode_guard():
+            with tempfile.TemporaryDirectory() as tempdir:
+                path = os.path.join(tempdir, "model")
+                model.to_static(
+                    path,
+                    config=dict(
+                        use_top_p=False,
+                    ),
+                )
+
+                model_path = os.path.join(tempdir, "model.pdmodel")
+                params_path = os.path.join(tempdir, "model.pdiparams")
+                config = paddle.inference.Config(model_path, params_path)
+
+                config.disable_gpu()
+                config.disable_glog_info()
+                predictor = paddle.inference.create_predictor(config)
+
+                model_kwargs["top_k"] = 1
+                model_kwargs["max_new_tokens"] = self.max_new_tokens
+
+                # create input
+                for key in model_kwargs.keys():
+                    if paddle.is_tensor(model_kwargs[key]):
+                        model_kwargs[key] = model_kwargs[key].numpy()
+                    elif isinstance(model_kwargs[key], float):
+                        model_kwargs[key] = np.array(model_kwargs[key], dtype="float32")
+                    else:
+                        model_kwargs[key] = np.array(model_kwargs[key], dtype="int64")
+
+                input_handles = {}
+                for name in predictor.get_input_names():
+                    input_handles[name] = predictor.get_input_handle(name)
+                    input_handles[name].copy_from_cpu(model_kwargs[name])
+
+                predictor.run()
+                output_names = predictor.get_output_names()
+                output_handle = predictor.get_output_handle(output_names[0])
+                results = output_handle.copy_to_cpu()
+
+                static_decoded_ids = results.tolist()
+
+        self.assertEqual(len(dygraph_decoded_ids[0]), self.max_new_tokens)
+        self.assertEqual(len(static_decoded_ids[0]), self.max_new_tokens)
+        self.assertEqual(dygraph_decoded_ids, static_decoded_ids)
+
+    def test_to_static_use_top_p(self):
+        tokenizer = self.TokenizerClass.from_pretrained(self.internal_testing_model)
+        if tokenizer.__class__.__name__ == "LlamaTokenizer":
+            tokenizer.pad_token = tokenizer.eos_token if tokenizer.eos_token else "<pad>"
+        model = self.CausalLMClass.from_pretrained(self.internal_testing_model)
+
+        model_kwargs = tokenizer(
+            self.article,
+            max_length=self.max_new_tokens,
+            truncation=True,
+            truncation_side="left",
+            return_tensors="pd",
+            padding=True,
+            add_special_tokens=True,
+        )
+
+        model.eval()
+
+        model_kwargs["use_cache"] = True
+        model_kwargs["max_new_tokens"] = self.max_new_tokens
+
+        with static_mode_guard():
+            with tempfile.TemporaryDirectory() as tempdir:
+
+                path = os.path.join(tempdir, "model")
+                model.to_static(
+                    path,
+                    config=dict(
+                        use_top_p=False,
+                    ),
+                )
+
+                model_path = os.path.join(tempdir, "model.pdmodel")
+                params_path = os.path.join(tempdir, "model.pdiparams")
+                config = paddle.inference.Config(model_path, params_path)
+
+                config.disable_gpu()
+                config.disable_glog_info()
+                predictor = paddle.inference.create_predictor(config)
+
+                model_kwargs["top_k"] = 1
+                model_kwargs["max_new_tokens"] = self.max_new_tokens
+                # create input
+                for key in model_kwargs.keys():
+                    if paddle.is_tensor(model_kwargs[key]):
+                        model_kwargs[key] = model_kwargs[key].numpy()
+                    else:
+                        model_kwargs[key] = np.array(model_kwargs[key])
+
+                input_handles = {}
+                for name in predictor.get_input_names():
+                    input_handles[name] = predictor.get_input_handle(name)
+                    input_handles[name].copy_from_cpu(model_kwargs[name])
+
+                predictor.run()
+                output_names = predictor.get_output_names()
+                output_handle = predictor.get_output_handle(output_names[0])
+                results = output_handle.copy_to_cpu()
+
+        self.assertEqual(len(results.tolist()[0]), self.max_new_tokens)
+        self.assertIsNotNone(results)

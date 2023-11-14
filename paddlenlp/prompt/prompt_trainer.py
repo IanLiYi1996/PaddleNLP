@@ -78,7 +78,7 @@ class PromptTrainer(Trainer):
             optimizers=optimizers,
         )
 
-        self.load_state_dict_from_checkpoint(args.resume_from_checkpoint)
+        self._load_from_checkpoint(args.resume_from_checkpoint)
 
         self.train_dataset = self._map_dataset(self.train_dataset)
         self.eval_dataset = self._map_dataset(self.eval_dataset)
@@ -130,8 +130,13 @@ class PromptTrainer(Trainer):
     def _prepare_input(self, inputs: Dict):
         return inputs
 
-    def _save(self, output_dir: Optional[str] = None, state_dict: Dict[str, Any] = None):
-        super(PromptTrainer, self)._save(output_dir, state_dict)
+    def _save(
+        self,
+        output_dir: Optional[str] = None,
+        state_dict: Dict[str, Any] = None,
+        merge_tensor_parallel: Optional[bool] = True,
+    ):
+        super(PromptTrainer, self)._save(output_dir, state_dict, merge_tensor_parallel)
         output_dir = output_dir if output_dir is not None else self.args.output_dir
         if self.template:
             self.template.save(output_dir)
@@ -142,12 +147,12 @@ class PromptTrainer(Trainer):
             os.makedirs(plm_output_dir, exist_ok=True)
             self.pretrained_model.save_pretrained(plm_output_dir)
 
-    def load_state_dict_from_checkpoint(self, resume_from_checkpoint: os.PathLike = None):
+    def _load_from_checkpoint(self, resume_from_checkpoint: os.PathLike = None):
         if resume_from_checkpoint is not None:
             self.template = AutoTemplate.load_from(
                 resume_from_checkpoint, self.tokenizer, self.args.max_seq_length, self._get_model().plm
             )
-        super(PromptTrainer, self).load_state_dict_from_checkpoint(resume_from_checkpoint)
+        super(PromptTrainer, self)._load_from_checkpoint(resume_from_checkpoint)
 
     def get_test_dataloader(self, test_dataset):
         test_dataset = self._map_dataset(test_dataset)

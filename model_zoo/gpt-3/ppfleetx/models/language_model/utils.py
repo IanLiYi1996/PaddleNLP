@@ -16,12 +16,12 @@ import logging
 
 import paddle
 import paddle.distributed as dist
-from paddle.fluid import core
+from paddle.base import core
 from ppfleetx.utils.log import logger
 
 
 def is_fused_matmul_bias_supported():
-    if paddle.is_compiled_with_cuda() and not paddle.is_compiled_with_rocm():
+    if paddle.is_compiled_with_cuda() and not paddle.is_compiled_with_rocm() or paddle.is_compiled_with_xpu():
         return hasattr(core.eager.ops.legacy, "fused_gemm_epilogue")
     else:
         return False
@@ -70,7 +70,7 @@ def process_model_configs(config):
         configs["fused_linear"] = False
         logging.warning(
             "The flag fused_linear only valid for cuda version higher than 11.6, "
-            "but the paddle is compiled with cuda " + paddle.version.cuda()
+            "but the paddle is compiled with cuda " + paddle.version.cuda() + ", or you can use xpu version."
         )
 
     pp_degree = config.Distributed.pp_degree
@@ -122,7 +122,7 @@ def process_optim_configs(config):
     nranks = dist.get_world_size()
     dp_degree = config["Distributed"]["dp_degree"]
     sharding_degree = config["Distributed"]["sharding"]["sharding_degree"]
-    if config["Optimizer"]["tensor_fusion"]:
+    if config["Optimizer"].get("tensor_fusion", None):
         assert (
             nranks == dp_degree * sharding_degree
         ), "tensor_fusion only support single card train or data/sharding parallel train"

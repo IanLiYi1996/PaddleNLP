@@ -54,7 +54,7 @@ class UNIMOPretrainedModel(PretrainedModel):
     base_model_prefix = "unimo"
     config_class = UNIMOConfig
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         # Initialization hook
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -132,7 +132,7 @@ class UNIMOModel(UNIMOPretrainedModel):
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
     Refer to the  superclass documentation for the generic methods.
 
-    This model is also a `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation/docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass.
+    This model is also a `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation/docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass.
     Use it as a regular Paddle Layer and refer to the Paddle
     documentation for all matter related to general usage and behavior.
 
@@ -171,8 +171,6 @@ class UNIMOModel(UNIMOPretrainedModel):
             config.num_hidden_layers,
             # post_encoder_norm,
         )
-
-        self.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
@@ -351,7 +349,6 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
             config.hidden_act,
             self.unimo.embeddings.word_embeddings.weight,
         )
-        self.apply(self.init_weights)
 
     def forward(
         self,

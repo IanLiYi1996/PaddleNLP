@@ -429,7 +429,7 @@ class ErniePretrainedModel(PretrainedModel):
     }
     base_model_prefix = "ernie"
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # only support dygraph, use truncated_normal and make it inplace
@@ -455,7 +455,7 @@ class ErnieModel(ErniePretrainedModel):
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
     Refer to the superclass documentation for the generic methods.
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
     Args:
         vocab_size (int):
@@ -550,7 +550,6 @@ class ErnieModel(ErniePretrainedModel):
         )
         self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
         self.pooler = ErniePooler(hidden_size, weight_attr)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -657,7 +656,6 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
         self.ernie = ernie  # allow ernie to be config
         self.dropout = nn.Dropout(dropout if dropout is not None else self.ernie.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.ernie.config["hidden_size"], num_classes)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""
@@ -706,7 +704,6 @@ class ErnieForQuestionAnswering(ErniePretrainedModel):
         super(ErnieForQuestionAnswering, self).__init__()
         self.ernie = ernie  # allow ernie to be config
         self.classifier = nn.Linear(self.ernie.config["hidden_size"], 2)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""
@@ -771,7 +768,6 @@ class ErnieForTokenClassification(ErniePretrainedModel):
         self.ernie = ernie  # allow ernie to be config
         self.dropout = nn.Dropout(dropout if dropout is not None else self.ernie.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.ernie.config["hidden_size"], num_classes)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""
@@ -884,8 +880,6 @@ class ErnieForPretraining(ErniePretrainedModel):
             weight_attr=weight_attr,
         )
 
-        self.apply(self.init_weights)
-
     def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None, masked_positions=None):
         r"""
         Args:
@@ -991,8 +985,6 @@ class ErnieForMaskedLM(ErniePretrainedModel):
             embedding_weights=self.ernie.embeddings.word_embeddings.weight,
         )
 
-        self.apply(self.init_weights)
-
     def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""
         Args:
@@ -1051,7 +1043,6 @@ class ErnieForMultipleChoice(ErniePretrainedModel):
         self.ernie = ernie
         self.dropout = nn.Dropout(dropout if dropout is not None else self.ernie.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.ernie.config["hidden_size"], 1)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""

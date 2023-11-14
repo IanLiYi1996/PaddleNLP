@@ -302,13 +302,6 @@ class Blip2PretrainedModel(PretrainedModel):
     _no_split_modules = ["Blip2Attention", "T5Block", "OPTDecoderLayer"]
     _keep_in_fp32_modules = ["wo"]
 
-    def init_weights(self):
-        """
-        A method executed at the end of each Transformer model initialization, to execute code that needs the model's
-        modules properly initialized (such as weight initialization).
-        """
-        self.apply(self._init_weights)
-
     def _init_weights(self, module):
         """Initialize the weights"""
         factor = self.config.initializer_range
@@ -442,8 +435,6 @@ class Blip2VisionModel(Blip2PretrainedModel):
         self.embeddings = Blip2VisionEmbeddings(config)
         self.encoder = Blip2Encoder(config)
         self.post_layernorm = nn.LayerNorm(embed_dim, epsilon=config.layer_norm_eps)
-
-        self.init_weights()
 
     def forward(
         self,
@@ -938,8 +929,6 @@ class Blip2QFormerModel(Blip2PretrainedModel):
 
         self.encoder = Blip2QFormerEncoder(config)
 
-        self.init_weights()
-
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
 
@@ -990,7 +979,7 @@ class Blip2QFormerModel(Blip2PretrainedModel):
         # positions we want to attend and -10000.0 for masked positions.
         # Since we are adding it to the raw scores before the softmax, this is
         # effectively the same as removing these entirely.
-        extended_attention_mask = extended_attention_mask.cast(dtype=self.dtype)  # fp16 compatibility
+        extended_attention_mask = extended_attention_mask.cast(dtype=self.config.dtype)  # fp16 compatibility
         extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
         return extended_attention_mask
 
@@ -1011,7 +1000,9 @@ class Blip2QFormerModel(Blip2PretrainedModel):
         # /transformer/transformer_layers.py#L270
         # encoder_extended_attention_mask = (encoder_extended_attention_mask ==
         # encoder_extended_attention_mask.transpose(-1, -2))
-        encoder_extended_attention_mask = encoder_extended_attention_mask.cast(dtype=self.dtype)  # fp16 compatibility
+        encoder_extended_attention_mask = encoder_extended_attention_mask.cast(
+            dtype=self.config.dtype
+        )  # fp16 compatibility
         encoder_extended_attention_mask = (1.0 - encoder_extended_attention_mask) * -1e4
 
         return encoder_extended_attention_mask
@@ -1049,7 +1040,7 @@ class Blip2QFormerModel(Blip2PretrainedModel):
         elif head_mask.ndim == 2:
             head_mask = head_mask.unsqueeze(1).unsqueeze(-1).unsqueeze(-1)  # We can specify head_mask for each layer
         assert head_mask.ndim == 5, f"head_mask.dim != 5, instead {head_mask.dim()}"
-        head_mask = head_mask.cast(dtype=self.dtype)  # switch to float if need + fp16 compatibility
+        head_mask = head_mask.cast(dtype=self.config.dtype)  # switch to float if need + fp16 compatibility
         return head_mask
 
     def forward(
@@ -1193,9 +1184,6 @@ class Blip2Model(Blip2PretrainedModel):
             else:
                 raise NotImplementedError
         self.language_model = language_model
-
-        # Initialize weights and apply final processing
-        self.init_weights()
 
     def get_input_embeddings(self) -> nn.Layer:
         return self.vision_model.embeddings.patch_embedding
@@ -1485,21 +1473,16 @@ class Blip2ForConditionalGeneration(Blip2PretrainedModel):
         self.qformer = Blip2QFormerModel(config.qformer_config)
         self.language_projection = nn.Linear(config.qformer_config.hidden_size, config.text_config.hidden_size)
         if config.use_decoder_only_language_model:
-            # language_model = AutoModelForCausalLM.from_config(config.text_config)
             if isinstance(config.text_config, OPTConfig):
                 language_model = OPTForCausalLM(config.text_config)
             else:
                 raise NotImplementedError
         else:
-            # language_model = AutoModelForSeq2SeqLM.from_config(config.text_config)
             if isinstance(config.text_config, T5Config):
                 language_model = T5ForConditionalGeneration(config.text_config)
             else:
                 raise NotImplementedError
         self.language_model = language_model
-
-        # Initialize weights and apply final processing
-        self.init_weights()
 
     def get_input_embeddings(self) -> nn.Layer:
         return self.vision_model.embeddings.patch_embedding
@@ -1585,7 +1568,7 @@ class Blip2ForConditionalGeneration(Blip2PretrainedModel):
         # step 3: use the language model, conditioned on the query outputs and the prompt
         language_model_inputs = self.language_projection(query_output)
         language_model_attention_mask = paddle.ones(language_model_inputs.shape[:-1], dtype="int64")
-        inputs_embeds = self.language_model.get_input_embeddings()(input_ids)
+        inputs_embeds = self.language_model.get_input_embeddings()(input_ids).cast(dtype=language_model_inputs.dtype)
         inputs_embeds = paddle.concat([language_model_inputs, inputs_embeds], axis=1)
 
         if attention_mask is None:

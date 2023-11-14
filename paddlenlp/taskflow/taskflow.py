@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import threading
-import warnings
 
 import paddle
 
@@ -34,20 +33,17 @@ from .pos_tagging import POSTaggingTask
 from .question_answering import QuestionAnsweringTask
 from .question_generation import QuestionGenerationTask
 from .sentiment_analysis import SentaTask, SkepTask, UIESentaTask
+from .text2text_generation import ChatGLMTask
 from .text_classification import TextClassificationTask
 from .text_correction import CSCTask
-from .text_feature_extraction import TextFeatureExtractionTask
+from .text_feature_extraction import (
+    SentenceFeatureExtractionTask,
+    TextFeatureExtractionTask,
+)
 from .text_similarity import TextSimilarityTask
 from .text_summarization import TextSummarizationTask
-from .text_to_image import (
-    TextToImageDiscoDiffusionTask,
-    TextToImageGenerationTask,
-    TextToImageStableDiffusionTask,
-)
 from .word_segmentation import SegJiebaTask, SegLACTask, SegWordTagTask
 from .zero_shot_text_classification import ZeroShotTextClassificationTask
-
-warnings.simplefilter(action="ignore", category=Warning, lineno=0, append=False)
 
 TASKS = {
     "dependency_parsing": {
@@ -437,68 +433,6 @@ TASKS = {
         },
         "default": {"mode": "finetune"},
     },
-    "text_to_image": {
-        "models": {
-            "dalle-mini": {
-                "task_class": TextToImageGenerationTask,
-                "task_flag": "text_to_image-dalle-mini",
-                "task_priority_path": "dalle-mini",
-            },
-            "dalle-mega-v16": {
-                "task_class": TextToImageGenerationTask,
-                "task_flag": "text_to_image-dalle-mega-v16",
-                "task_priority_path": "dalle-mega-v16",
-            },
-            "dalle-mega": {
-                "task_class": TextToImageGenerationTask,
-                "task_flag": "text_to_image-dalle-mega",
-                "task_priority_path": "dalle-mega",
-            },
-            "pai-painter-painting-base-zh": {
-                "task_class": TextToImageGenerationTask,
-                "task_flag": "text_to_image-pai-painter-painting-base-zh",
-                "task_priority_path": "pai-painter-painting-base-zh",
-            },
-            "pai-painter-scenery-base-zh": {
-                "task_class": TextToImageGenerationTask,
-                "task_flag": "text_to_image-pai-painter-scenery-base-zh",
-                "task_priority_path": "pai-painter-scenery-base-zh",
-            },
-            "pai-painter-commercial-base-zh": {
-                "task_class": TextToImageGenerationTask,
-                "task_flag": "text_to_image-pai-painter-commercial-base-zh",
-                "task_priority_path": "pai-painter-commercial-base-zh",
-            },
-            "openai/disco-diffusion-clip-vit-base-patch32": {
-                "task_class": TextToImageDiscoDiffusionTask,
-                "task_flag": "text_to_image-openai/disco-diffusion-clip-vit-base-patch32",
-                "task_priority_path": "openai/disco-diffusion-clip-vit-base-patch32",
-            },
-            "openai/disco-diffusion-clip-rn50": {
-                "task_class": TextToImageDiscoDiffusionTask,
-                "task_flag": "text_to_image-openai/disco-diffusion-clip-rn50",
-                "task_priority_path": "openai/disco-diffusion-clip-rn50",
-            },
-            "openai/disco-diffusion-clip-rn101": {
-                "task_class": TextToImageDiscoDiffusionTask,
-                "task_flag": "text_to_image-openai/disco-diffusion-clip-rn101",
-                "task_priority_path": "openai/disco-diffusion-clip-rn101",
-            },
-            "PaddlePaddle/disco_diffusion_ernie_vil-2.0-base-zh": {
-                "task_class": TextToImageDiscoDiffusionTask,
-                "task_flag": "text_to_image-PaddlePaddle/disco_diffusion_ernie_vil-2.0-base-zh",
-                "task_priority_path": "PaddlePaddle/disco_diffusion_ernie_vil-2.0-base-zh",
-            },
-            "CompVis/stable-diffusion-v1-4": {
-                "task_class": TextToImageStableDiffusionTask,
-                "task_flag": "text_to_image-CompVis/stable-diffusion-v1-4",
-                "task_priority_path": "CompVis/stable-diffusion-v1-4",
-            },
-        },
-        "default": {
-            "model": "CompVis/stable-diffusion-v1-4",
-        },
-    },
     "document_intelligence": {
         "models": {
             "docprompt": {
@@ -528,6 +462,27 @@ TASKS = {
             },
         },
         "default": {"model": "unimo-text-1.0-dureader_qg"},
+    },
+    "text2text_generation": {
+        "models": {
+            "THUDM/chatglm-6b": {
+                "task_class": ChatGLMTask,
+                "task_flag": "text_generation-THUDM/chatglm-6b",
+            },
+            "THUDM/chatglm2-6b": {
+                "task_class": ChatGLMTask,
+                "task_flag": "text_generation-THUDM/chatglm2-6b",
+            },
+            "__internal_testing__/tiny-random-chatglm": {
+                "task_class": ChatGLMTask,
+                "task_flag": "text_generation-tiny-random-chatglm",
+            },
+            "THUDM/chatglm-6b-v1.1": {
+                "task_class": ChatGLMTask,
+                "task_flag": "text_generation-THUDM/chatglm-6b-v1.1",
+            },
+        },
+        "default": {"model": "THUDM/chatglm-6b-v1.1"},
     },
     "zero_shot_text_classification": {
         "models": {
@@ -717,6 +672,21 @@ TASKS = {
                 "task_flag": "feature_extraction-tiny-random-ernievil2",
                 "task_priority_path": "__internal_testing__/tiny-random-ernievil2",
             },
+            "moka-ai/m3e-base": {
+                "task_class": SentenceFeatureExtractionTask,
+                "task_flag": "feature_extraction-moka-ai/m3e-base",
+                "task_priority_path": "moka-ai/m3e-base",
+            },
+            "BAAI/bge-small-zh-v1.5": {
+                "task_class": SentenceFeatureExtractionTask,
+                "task_flag": "feature_extraction-BAAI/bge-small-zh-v1.5",
+                "task_priority_path": "BAAI/bge-small-zh-v1.5",
+            },
+            "__internal_testing__/tiny-random-m3e": {
+                "task_class": SentenceFeatureExtractionTask,
+                "task_flag": "__internal_testing__/tiny-random-m3e",
+                "task_priority_path": "__internal_testing__/tiny-random-m3e",
+            },
         },
         "default": {"model": "PaddlePaddle/ernie_vil-2.0-base-zh"},
     },
@@ -779,6 +749,9 @@ support_argument_list = [
     "uie-x-base",
     "__internal_testing__/tiny-random-uie-m",
     "__internal_testing__/tiny-random-uie-x",
+    "THUDM/chatglm-6b",
+    "THUDM/chatglm2-6b",
+    "THUDM/chatglm-6b-v1.1",
 ]
 
 
@@ -842,11 +815,11 @@ class Taskflow(object):
         # Add the lock for the concurrency requests
         self._lock = threading.Lock()
 
-    def __call__(self, *inputs):
+    def __call__(self, *inputs, **kwargs):
         """
         The main work function in the taskflow.
         """
-        results = self.task_instance(inputs)
+        results = self.task_instance(inputs, **kwargs)
         return results
 
     def help(self):

@@ -336,7 +336,7 @@ class ErnieDocPretrainedModel(PretrainedModel):
     }
     base_model_prefix = "ernie_doc"
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         # Initialization hook
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -423,7 +423,7 @@ class ErnieDocModel(ErnieDocPretrainedModel):
     Refer to the superclass documentation for the generic methods.
 
     This model is also a `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
@@ -682,7 +682,6 @@ class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
         self.ernie_doc = ernie_doc
         self.linear = nn.Linear(self.ernie_doc.config["hidden_size"], num_classes)
         self.dropout = nn.Dropout(dropout, mode="upscale_in_train")
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, memories, token_type_ids, position_ids, attn_mask):
         r"""
@@ -774,7 +773,6 @@ class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
         self.ernie_doc = ernie_doc  # allow ernie_doc to be config
         self.dropout = nn.Dropout(dropout, mode="upscale_in_train")
         self.linear = nn.Linear(self.ernie_doc.config["hidden_size"], num_classes)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, memories, token_type_ids, position_ids, attn_mask):
         r"""
@@ -865,7 +863,6 @@ class ErnieDocForQuestionAnswering(ErnieDocPretrainedModel):
         self.ernie_doc = ernie_doc  # allow ernie_doc to be config
         self.dropout = nn.Dropout(dropout, mode="upscale_in_train")
         self.linear = nn.Linear(self.ernie_doc.config["hidden_size"], 2)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, memories, token_type_ids, position_ids, attn_mask):
         r"""

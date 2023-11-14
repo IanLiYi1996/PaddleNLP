@@ -98,7 +98,7 @@ class Task(metaclass=abc.ABCMeta):
         """
 
     @abstractmethod
-    def _run_model(self, inputs):
+    def _run_model(self, inputs, **kwargs):
         """
         Run the task model from the outputs of the `_tokenize` function.
         """
@@ -202,7 +202,7 @@ class Task(metaclass=abc.ABCMeta):
                 logger.info((">>> [InferBackend] INT8 inference on CPU ..."))
         elif paddle.get_device().split(":", 1)[0] == "npu":
             self._config.disable_gpu()
-            self._config.enable_npu(self.kwargs["device_id"])
+            self._config.enable_custom_device("npu", self.kwargs["device_id"])
         else:
             if self._infer_precision == "int8":
                 logger.info(
@@ -246,7 +246,7 @@ class Task(metaclass=abc.ABCMeta):
             onnx_dir = os.path.join(self._task_path, "onnx", self.export_type)
 
         if not os.path.exists(onnx_dir):
-            os.mkdir(onnx_dir)
+            os.makedirs(onnx_dir, exist_ok=True)
         float_onnx_file = os.path.join(onnx_dir, "model.onnx")
         if not os.path.exists(float_onnx_file) or self._param_updated:
             onnx_model = paddle2onnx.command.c_paddle_to_onnx(
@@ -333,7 +333,7 @@ class Task(metaclass=abc.ABCMeta):
             _base_path = (
                 self._task_path
                 if not self.from_hf_hub
-                else os.path.join(self._home_path, "taskflow", self.task, self.model)
+                else os.path.join(self._home_path, "taskflow", self.task, self._task_path)
             )
             self.inference_model_path = os.path.join(_base_path, "static", "inference")
             if not os.path.exists(self.inference_model_path + ".pdiparams") or self._param_updated:
@@ -453,8 +453,13 @@ class Task(metaclass=abc.ABCMeta):
                     temp_text_list = [sen[i : i + max_text_len] for i in range(0, lens, max_text_len)]
                     short_input_texts.extend(temp_text_list)
                     if with_bbox:
-                        temp_bbox_list = [bbox_list[idx][i : i + max_text_len] for i in range(0, lens, max_text_len)]
-                        short_bbox_list.extend(temp_bbox_list)
+                        if bbox_list[idx] is not None:
+                            temp_bbox_list = [
+                                bbox_list[idx][i : i + max_text_len] for i in range(0, lens, max_text_len)
+                            ]
+                            short_bbox_list.extend(temp_bbox_list)
+                        else:
+                            short_bbox_list.extend([None for _ in range(len(temp_text_list))])
                     short_idx = cnt_short
                     cnt_short += math.ceil(lens / max_text_len)
                     temp_text_id = [short_idx + i for i in range(cnt_short - short_idx)]
@@ -517,8 +522,8 @@ class Task(metaclass=abc.ABCMeta):
         """
         print("Examples:\n{}".format(self._usage))
 
-    def __call__(self, *args):
+    def __call__(self, *args, **kwargs):
         inputs = self._preprocess(*args)
-        outputs = self._run_model(inputs)
+        outputs = self._run_model(inputs, **kwargs)
         results = self._postprocess(outputs)
         return results

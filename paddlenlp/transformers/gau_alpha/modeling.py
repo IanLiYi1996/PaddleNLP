@@ -230,7 +230,7 @@ class GAUAlphaPretrainedModel(PretrainedModel):
     pretrained_init_configuration = GAUAlPHA_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = GAUAlPHA_PRETRAINED_RESOURCE_FILES_MAP
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -252,7 +252,7 @@ class GAUAlphaModel(GAUAlphaPretrainedModel):
     Refer to the superclass documentation for the generic methods.
 
     This model is also a Paddle `paddle.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
@@ -310,8 +310,6 @@ class GAUAlphaModel(GAUAlphaPretrainedModel):
         self.embeddings = GAUAlphaEmbeddings(config)
 
         self.encoder = GAUAlphaEncoder(config)
-
-        self.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
@@ -450,7 +448,6 @@ class GAUAlphaForQuestionAnswering(GAUAlphaPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, 2)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
         r"""
@@ -525,7 +522,6 @@ class GAUAlphaForSequenceClassification(GAUAlphaPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
         r"""
@@ -587,7 +583,6 @@ class GAUAlphaForTokenClassification(GAUAlphaPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
         r"""
@@ -648,7 +643,6 @@ class GAUAlphaForMultipleChoice(GAUAlphaPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, 1)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
         r"""
@@ -777,8 +771,6 @@ class GAUAlphaForMaskedLM(GAUAlphaPretrainedModel):
             config=config,
             embedding_weights=self.gau_alpha.embeddings.word_embeddings.weight,
         )
-
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
         r"""

@@ -243,7 +243,7 @@ class T5ModelTester:
         self.parent.assertEqual(len(outputs), 4 if self.parent.use_labels else 3)
         if self.parent.use_labels:
             self.parent.assertEqual(outputs[1].shape, [self.batch_size, self.decoder_seq_length, self.vocab_size])
-            self.parent.assertEqual(outputs[0].shape, [1])
+            self.parent.assertIsInstance(outputs[0].item(), float)
         else:
             self.parent.assertEqual(outputs[0].shape, [self.batch_size, self.decoder_seq_length, self.vocab_size])
 
@@ -737,26 +737,6 @@ class T5CompatibilityTest(unittest.TestCase):
             )
 
     @require_package("transformers", "torch")
-    def test_t5_converter_from_local_dir_with_enable_torch(self):
-        with tempfile.TemporaryDirectory() as tempdir:
-            model_id = "hf-internal-testing/tiny-random-T5Model"
-            # 1. forward the torch  model
-            from transformers import T5Model
-
-            torch_model = T5Model.from_pretrained(model_id)
-            torch_model.save_pretrained(tempdir)
-
-            # 2. forward the paddle model
-            from paddlenlp.transformers import T5Model, model_utils
-
-            model_utils.ENABLE_TORCH_CHECKPOINT = False
-
-            with self.assertRaises(ValueError) as error:
-                T5Model.from_pretrained(tempdir)
-                self.assertIn("conversion is been disabled" in str(error.exception))
-            model_utils.ENABLE_TORCH_CHECKPOINT = True
-
-    @require_package("transformers", "torch")
     def test_t5_converter_from_local_dir(self):
         with tempfile.TemporaryDirectory() as tempdir:
             model_id = "hf-internal-testing/tiny-random-T5Model"
@@ -777,7 +757,7 @@ class T5CompatibilityTest(unittest.TestCase):
             # 2. forward the paddle model
             from paddlenlp.transformers import T5Model
 
-            paddle_model = T5Model.from_pretrained(tempdir)
+            paddle_model = T5Model.from_pretrained(tempdir, convert_from_torch=True)
             paddle_model.eval()
             paddle_logit = paddle_model(
                 input_ids=paddle.to_tensor(input_ids), decoder_input_ids=paddle.to_tensor(input_ids)
@@ -812,7 +792,7 @@ class T5CompatibilityTest(unittest.TestCase):
             # 2. forward the paddle model
             from paddlenlp.transformers import T5ForConditionalGeneration
 
-            paddle_model = T5ForConditionalGeneration.from_pretrained(tempdir)
+            paddle_model = T5ForConditionalGeneration.from_pretrained(tempdir, convert_from_torch=True)
             paddle_model.eval()
             paddle_logit = paddle_model(
                 input_ids=paddle.to_tensor(input_ids), decoder_input_ids=paddle.to_tensor(input_ids)
@@ -1202,7 +1182,7 @@ class TestAsymmetricT5(unittest.TestCase):
 
         if self.use_labels:
             assert outputs[1].shape == [tester.batch_size, tester.decoder_seq_length, tester.vocab_size]
-            assert outputs[0].shape == [1]
+            assert isinstance(outputs[0].item(), float)
         else:
             assert outputs[0].shape == [tester.batch_size, tester.decoder_seq_length, tester.vocab_size]
         return model

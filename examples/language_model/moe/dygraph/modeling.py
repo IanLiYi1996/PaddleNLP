@@ -26,7 +26,6 @@ from paddle.distributed.fleet.meta_parallel import (
     SharedLayerDesc,
     get_rng_state_tracker,
 )
-from paddle.fluid import layers
 from paddle.incubate.distributed.models import moe
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
 
@@ -217,12 +216,8 @@ class MultiHeadAttention(nn.Layer):
             k, v = self.compute_kv(key, value)
             return self.StaticCache(k, v)
         elif value is None:  # incremental_state
-            k = layers.fill_constant_batch_size_like(
-                input=key, shape=[-1, self.num_heads, 0, self.head_dim], dtype=key.dtype, value=0
-            )
-            v = layers.fill_constant_batch_size_like(
-                input=key, shape=[-1, self.num_heads, 0, self.head_dim], dtype=key.dtype, value=0
-            )
+            k = paddle.full(shape=[key.shape[0], self.num_heads, 0, self.head_dim], dtype=key.dtype, fill_value=0)
+            v = paddle.full(shape=[key.shape[0], self.num_heads, 0, self.head_dim], dtype=key.dtype, fill_value=0)
             return self.Cache(k, v)
         else:
             # incremental_state with initial value, mainly for usage like UniLM
@@ -649,7 +644,7 @@ class GPTPretrainedModel(PretrainedModel):
     }
     base_model_prefix = "gpt"
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         # no hook
         return
@@ -746,7 +741,6 @@ class GPTModel(GPTPretrainedModel):
 
         self.decoder = TransformerDecoder(decoder_layers, num_hidden_layers, norm="LayerNorm", hidden_size=hidden_size)
 
-        self.apply(self.init_weights)
         self.checkpoints = []
 
     def forward(self, input_ids, position_ids=None, attention_mask=None, use_cache=False, cache=None):
@@ -783,7 +777,6 @@ class GPTForPretraining(GPTPretrainedModel):
     def __init__(self, gpt):
         super(GPTForPretraining, self).__init__()
         self.gpt = gpt
-        self.apply(self.init_weights)
 
     def forward(
         self, input_ids, position_ids=None, attention_mask=None, masked_positions=None, use_cache=False, cache=None
@@ -841,7 +834,6 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
         super(GPTForGreedyGeneration, self).__init__()
         self.gpt = gpt
         self.max_predict_len = paddle.to_tensor(max_predict_len, dtype="int32")
-        self.apply(self.init_weights)
 
     def model(
         self, input_ids, position_ids=None, attention_mask=None, masked_positions=None, use_cache=False, cache=None
@@ -898,7 +890,6 @@ class GPTLMHeadModel(GPTPretrainedModel):
         self.lm_head = GPTLMHead(
             self.gpt.config["hidden_size"], self.gpt.config["vocab_size"], self.gpt.embeddings.word_embeddings.weight
         )
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, position_ids=None, attention_mask=None, use_cache=False, cache=None):
         outputs = self.gpt(

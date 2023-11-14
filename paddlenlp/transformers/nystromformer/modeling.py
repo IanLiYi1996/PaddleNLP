@@ -68,7 +68,9 @@ class NystromformerEmbeddings(nn.Layer):
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
         # position_ids (1, len position emb) is contiguous in memory and exported when serialized
-        self.register_buffer("position_ids", paddle.arange(config.max_position_embeddings).expand((1, -1)) + 2)
+        self.register_buffer(
+            "position_ids", paddle.arange(config.max_position_embeddings, dtype="int64").expand((1, -1)) + 2
+        )
         self.position_embedding_type = getattr(config, "position_embedding_type", "absolute")
         self.register_buffer(
             "token_type_ids",
@@ -391,7 +393,8 @@ class NystromformerEncoder(nn.Layer):
         self.config = config
         self.layer = nn.LayerList([NystromformerLayer(config) for _ in range(config.num_hidden_layers)])
         # The parameter output_attentions in forward shoule set to be False when self.use_recompute = True.
-        self.use_recompute = False
+        # Recompute defaults to False and is controlled by Trainer
+        self.enable_recompute = False
 
     def forward(
         self,
@@ -407,7 +410,7 @@ class NystromformerEncoder(nn.Layer):
         for i, layer_module in enumerate(self.layer):
             if output_hidden_states:
                 all_hidden_states = all_hidden_states + (hidden_states,)
-            if self.use_recompute and self.training:
+            if self.enable_recompute and self.training:
 
                 def create_cumtom_forward(module):
                     def custom_forward(*inputs):
@@ -500,7 +503,7 @@ class NystromformerPretrainedModel(PretrainedModel):
     pretrained_init_configuration = NYSTROMFORMER_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = NYSTROMFORMER_PRETRAINED_RESOURCE_FILES_MAP
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding, nn.Conv2D)):
             # only support dygraph, use truncated_normal and make it inplace
@@ -518,7 +521,7 @@ class NystromformerPretrainedModel(PretrainedModel):
 
     def _set_recompute(self, module, value=False):
         if isinstance(module, NystromformerEncoder):
-            module.use_recompute = value
+            module.enable_recompute = value
 
 
 @register_base_model
@@ -540,7 +543,6 @@ class NystromformerModel(NystromformerPretrainedModel):
         super(NystromformerModel, self).__init__(config)
         self.embeddings = NystromformerEmbeddings(config)
         self.encoder = NystromformerEncoder(config)
-        self.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
@@ -703,8 +705,6 @@ class NystromformerForMaskedLM(NystromformerPretrainedModel):
         self.nystromformer = NystromformerModel(config)
         self.cls = NystromformerOnlyMLMHead(config)
 
-        self.apply(self.init_weights)
-
     def forward(
         self,
         input_ids: Optional[Tensor] = None,
@@ -847,8 +847,6 @@ class NystromformerForSequenceClassification(NystromformerPretrainedModel):
         self.classifier = NystromformerClassificationHead(config)
         self.config = config if config is not None else NystromformerConfig()
 
-        self.apply(self.init_weights)
-
     def forward(
         self,
         input_ids: Optional[Tensor] = None,
@@ -987,8 +985,6 @@ class NystromformerForMultipleChoice(NystromformerPretrainedModel):
         self.pre_classifier = nn.Linear(config.hidden_size, config.hidden_size)
         self.classifier = nn.Linear(config.hidden_size, 1)
 
-        self.apply(self.init_weights)
-
     def forward(
         self,
         input_ids: Optional[Tensor] = None,
@@ -1114,8 +1110,6 @@ class NystromformerForTokenClassification(NystromformerPretrainedModel):
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
 
-        self.apply(self.init_weights)
-
     def forward(
         self,
         input_ids: Optional[Tensor] = None,
@@ -1223,8 +1217,6 @@ class NystromformerForQuestionAnswering(NystromformerPretrainedModel):
         config.num_labels = 2
         self.nystromformer = NystromformerModel(config)
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-
-        self.apply(self.init_weights)
 
     def forward(
         self,

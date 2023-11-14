@@ -32,7 +32,7 @@ def parse_args(MODEL_CLASSES):
     parser.add_argument("--input_dir", default=None, type=str, required=True, help="The input directory where the data will be read from.", )
     parser.add_argument("--output_dir", default=None, type=str, required=True, help="The output directory where the training logs and checkpoints will be written.")
     parser.add_argument("--split", type=str, default='949,50,1', help="Train/valid/test data split.")
-
+    parser.add_argument("--data_impl", type=str, default='mmap', help="mmap/lazy format converted from preprocessed data.")
     parser.add_argument("--binary_head", type=strtobool, default=True, help="True for NSP task.")
     parser.add_argument("--max_seq_len", type=int, default=1024, help="Max sequence length.")
     parser.add_argument("--micro_batch_size", default=8, type=int, help="Batch size per device for one step training.", )
@@ -65,7 +65,7 @@ def parse_args(MODEL_CLASSES):
     parser.add_argument("--sharding_degree", type=int, default=1, help="Sharding degree. Share the parameters to many cards.")
     parser.add_argument("--dp_degree", type=int, default=1, help="Data Parallelism degree.")
     parser.add_argument("--mp_degree", type=int, default=1, help="Model Parallelism degree. Spliting the linear layers to many cards.")
-    parser.add_argument("--pp_degree", type=int, default=1, help="Pipeline Parallelism degree. Spliting the the model layers to different parts.")
+    parser.add_argument("--pp_degree", type=int, default=1, help="Pipeline Parallelism degree. Spliting the model layers to different parts.")
     parser.add_argument("--use_recompute", type=strtobool, nargs='?', const=False, help="Using the recompute to save the memory.")
 
     # AMP config

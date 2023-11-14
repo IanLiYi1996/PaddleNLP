@@ -283,7 +283,7 @@ def run_evaluate(
         ret = exe.run(program, feed=batch, fetch_list=list(eval_fetch.values()))
         if is_last:
             for k, v in zip(list(eval_fetch.keys()), ret):
-                all_ret[k].append(float(v[0]))
+                all_ret[k].append(v.item())
 
         if eval_step >= iter_steps - 1:
             if not is_last or log_writer is None:
@@ -345,6 +345,7 @@ def do_train(args):
 
     worker_num = fleet.worker_num()
     worker_index = fleet.worker_index()
+
     assert (
         args.dp_degree * args.sharding_degree * args.mp_degree * args.pp_degree == worker_num
     ), "The product of degree num should be equal to worker_num."
@@ -591,7 +592,7 @@ def do_train(args):
             if log_writer is not None:
                 for k, v in zip(fetchs_keys, ret):
                     if k in fetch_loss_vars:
-                        loss_res[k].append(v[0])
+                        loss_res[k].append(v.item())
 
             if (step + 1) % args.accumulate_steps != 0:
                 continue
@@ -672,10 +673,6 @@ def do_train(args):
                 output_dir = os.path.join(args.output_dir, "model_%d" % global_step)
                 logger.debug("saving models to {}".format(output_dir))
                 save_persistables(exe, os.path.join(output_dir, "static_vars"), main_program)
-                # if global_step == args.save_steps:
-                #     model.init_config["init_args"][0].init_config.pop(
-                #         "topo", None)
-                model.save_pretrained(output_dir)
                 tokenizer.save_pretrained(output_dir)
                 tic_train = time.time()
 

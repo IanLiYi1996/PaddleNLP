@@ -63,7 +63,7 @@ class TinyBertPretrainedModel(PretrainedModel):
 
     base_model_prefix = "tinybert"
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -89,7 +89,7 @@ class TinyBertModel(TinyBertPretrainedModel):
     Refer to the superclass documentation for the generic methods.
 
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
@@ -125,7 +125,6 @@ class TinyBertModel(TinyBertPretrainedModel):
             [nn.Linear(config.hidden_size, config.fit_size) for i in range(config.num_hidden_layers + 1)]
         )
         self.fit_dense = nn.Linear(config.hidden_size, config.fit_size)
-        self.apply(self.init_weights)
 
     def get_input_embeddings(self) -> nn.Embedding:
         """get input embedding of TinyBert Pretrained Model
@@ -318,7 +317,6 @@ class TinyBertForPretraining(TinyBertPretrainedModel):
     def __init__(self, config: TinyBertConfig):
         super(TinyBertForPretraining, self).__init__(config)
         self.tinybert = TinyBertModel(config)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -402,7 +400,6 @@ class TinyBertForSequenceClassification(TinyBertPretrainedModel):
         )
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.activation = nn.ReLU()
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -430,8 +427,8 @@ class TinyBertForSequenceClassification(TinyBertPretrainedModel):
                 See :class:`TinyBertModel`.
             labels (Tensor of shape `(batch_size,)`, optional):
                 Labels for computing the sequence classification/regression loss.
-                Indices should be in `[0, ..., num_classes - 1]`. If `num_classes == 1`
-                a regression loss is computed (Mean-Square loss), If `num_classes > 1`
+                Indices should be in `[0, ..., num_labels - 1]`. If `num_labels == 1`
+                a regression loss is computed (Mean-Square loss), If `num_labels > 1`
                 a classification loss is computed (Cross-Entropy).
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
@@ -480,13 +477,24 @@ class TinyBertForSequenceClassification(TinyBertPretrainedModel):
 
         loss = None
         if labels is not None:
-            if self.num_classes == 1:
+            if self.config.problem_type is None:
+                if self.num_labels == 1:
+                    self.config.problem_type = "regression"
+                elif self.num_labels > 1 and (labels.dtype == paddle.int64 or labels.dtype == paddle.int32):
+                    self.config.problem_type = "single_label_classification"
+                else:
+                    self.config.problem_type = "multi_label_classification"
+
+            if self.config.problem_type == "regression":
                 loss_fct = paddle.nn.MSELoss()
-                loss = loss_fct(logits, labels)
-            elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
+                if self.num_labels == 1:
+                    loss = loss_fct(logits.squeeze(), labels.squeeze())
+                else:
+                    loss = loss_fct(logits, labels)
+            elif self.config.problem_type == "single_label_classification":
                 loss_fct = paddle.nn.CrossEntropyLoss()
-                loss = loss_fct(logits.reshape((-1, self.num_classes)), labels.reshape((-1,)))
-            else:
+                loss = loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
+            elif self.config.problem_type == "multi_label_classification":
                 loss_fct = paddle.nn.BCEWithLogitsLoss()
                 loss = loss_fct(logits, labels)
 
@@ -518,7 +526,6 @@ class TinyBertForQuestionAnswering(TinyBertPretrainedModel):
         super(TinyBertForQuestionAnswering, self).__init__(config)
         self.tinybert = TinyBertModel(config)
         self.classifier = nn.Linear(config.hidden_size, 2)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -651,7 +658,6 @@ class TinyBertForMultipleChoice(TinyBertPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, 1)
-        self.apply(self.init_weights)
 
     def forward(
         self,

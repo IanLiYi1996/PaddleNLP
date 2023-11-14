@@ -108,8 +108,8 @@ class VerbalizerTest(unittest.TestCase):
 
     def test_normalize(self):
         outputs = paddle.rand([2, 1, 2, 3])
-        self.assertAlmostEqual(self.default_verb.normalize(outputs)[0].sum().tolist()[0], 1, 6)
-        self.assertAlmostEqual(self.default_verb.normalize(outputs)[1].sum().tolist()[0], 1, 6)
+        self.assertAlmostEqual(self.default_verb.normalize(outputs)[0].sum().item(), 1, 6)
+        self.assertAlmostEqual(self.default_verb.normalize(outputs)[1].sum().item(), 1, 6)
 
     def test_save_and_load(self):
         with tempfile.TemporaryDirectory() as tmpdirname:
@@ -189,32 +189,30 @@ class VerbalizerTest(unittest.TestCase):
         [
             (
                 "__internal_testing__/tiny-random-ernie",
-                ["cls", "predictions", "decoder_weight"],
+                ["cls", "predictions", "decoder"],
                 ErnieLMPredictionHead,
-                ["decoder_weight", "decoder_bias"],
+                ["decoder_bias", "decoder.weight", "decoder.bias"],
                 ["transform.weight", "transform.bias", "layer_norm.weight", "layer_norm.bias"],
             ),
             (
                 "albert-chinese-tiny",
                 ["predictions", "decoder"],
                 AlbertMLMHead,
-                ["decoder.weight"],
-                ["bias", "layer_norm.weight", "layer_norm.bias", "dense.weight", "dense.bias"],
+                ["bias", "decoder.weight", "decoder.bias"],
+                ["layer_norm.weight", "layer_norm.bias", "dense.weight", "dense.bias"],
             ),
         ]
     )
     def test_soft_initialization(self, model_name, head_name, head_class, head_params, non_head_params):
         tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = AutoModelForMaskedLM.from_pretrained(model_name)
+        model = AutoModelForMaskedLM.from_pretrained(model_name, ignore_mismatched_sizes=True)
         verb = SoftVerbalizer(self.default_label_words, tokenizer, model)
-
         self.assertEqual(verb.head_name, head_name)
         self.assertTrue(isinstance(verb.head, head_class))
         self.assertTrue(isinstance(getattr(model, head_name[0]), MaskedLMIdentity))
         module = getattr(verb.head, verb.head_name[-1])
-        module = module.weight if isinstance(module, paddle.nn.Linear) else module
-        self.assertTrue(len(self.default_label_words) in module.shape)
-
+        # module = module.weight if isinstance(module, paddle.nn.Linear) else module
+        self.assertTrue(len(self.default_label_words) in module.weight.shape)
         self.assertEqual([x[0] for x in verb.head_parameters()], head_params)
         self.assertEqual([x[0] for x in verb.non_head_parameters()], non_head_params)
 
